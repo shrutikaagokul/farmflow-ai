@@ -76,7 +76,7 @@ Field names **must not be renamed** — other agents depend on them.
 > The shared FarmFlow input contract does **not** include an `acreage` field.
 > CropGuard uses a documented default of **12 acres** (`PROTOTYPE_ACRES = 12.0`)
 > to compute absolute yield estimates. This matches the FarmFlow demo scenario
-> (12-acre Tomato farm, Karnataka).
+> (Paddy farm deployment, Thanjavur, Tamil Nadu).
 >
 > When the shared input contract is updated to include acreage, pass it as an
 > optional `acreage` field in `FarmInput` and `predictor.py` will use it.

@@ -61,16 +61,24 @@ export default function Home() {
                 FarmFlow connects real-time farm conditions, crop intelligence, market demand and distribution into one autonomous decision loop.
               </p>
 
-              <div className="flex flex-wrap items-center gap-6 pt-2">
+              <div className="flex flex-wrap items-center gap-4 pt-2">
                 <Link
-                  to="/dashboard"
-                  className="inline-flex items-center justify-center gap-3 px-8 py-3.5 bg-[#102B18] border border-[#315F38] text-[#E8E3D5] font-mono text-xs tracking-[0.2em] uppercase hover:bg-[#315F38] hover:border-[#6F956B] transition-all group"
+                  to="/try-demo"
+                  className="inline-flex items-center justify-center gap-3 px-8 py-3.5 bg-[#102B18] border border-[#315F38] text-[#E8E3D5] font-mono text-xs tracking-[0.2em] uppercase hover:bg-[#315F38] hover:border-[#6F956B] transition-all shadow-[0_0_20px_rgba(49,95,56,0.2)] group"
                 >
-                  <span>Enter Command Center</span>
+                  <span className="w-2 h-2 rounded-full bg-[#6F956B] animate-pulse" />
+                  <span>Try Live Demo</span>
                   <span className="text-[#6F956B] group-hover:translate-x-1 transition-transform">→</span>
                 </Link>
 
-                <div className="font-mono text-[10px] tracking-[0.25em] text-[#9A9D91] uppercase flex items-center gap-2">
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center justify-center gap-3 px-6 py-3.5 bg-[#101510] border border-[#1A241B] text-[#9A9D91] hover:text-[#E8E3D5] hover:border-[#315F38] font-mono text-xs tracking-[0.2em] uppercase transition-all"
+                >
+                  <span>Command Center</span>
+                </Link>
+
+                <div className="font-mono text-[10px] tracking-[0.25em] text-[#9A9D91] uppercase flex items-center gap-2 pl-2">
                   <span className="text-[#6F956B]">SENSE</span>
                   <span className="text-[#1A241B]">•</span>
                   <span className="text-[#6F956B]">PREDICT</span>
@@ -86,23 +94,23 @@ export default function Home() {
             <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-4 gap-6 pt-6 lg:pt-0 lg:border-l lg:border-[#1A241B] lg:pl-8">
               <div>
                 <span className="block font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase">Field Target</span>
-                <span className="font-display text-lg sm:text-xl text-[#E8E3D5] mt-1 block">12-Acre</span>
-                <span className="font-mono text-[10px] text-[#6F956B]">Tomato / Bloom</span>
+                <span className="font-display text-lg sm:text-xl text-[#E8E3D5] mt-1 block">10-Acre</span>
+                <span className="font-mono text-[10px] text-[#6F956B]">Paddy (Thanjavur)</span>
               </div>
               <div>
                 <span className="block font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase">Projected</span>
-                <span className="font-display text-lg sm:text-xl text-[#E8E3D5] mt-1 block">1,420 KG</span>
+                <span className="font-display text-lg sm:text-xl text-[#E8E3D5] mt-1 block">5,200 KG</span>
                 <span className="font-mono text-[10px] text-[#9A9D91]">Expected Yield</span>
               </div>
               <div>
                 <span className="block font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase">Water Conserved</span>
-                <span className="font-display text-lg sm:text-xl text-[#6F956B] mt-1 block">1,800 L*</span>
-                <span className="font-mono text-[10px] text-[#9A9D91]">Rain-Delay Savings</span>
+                <span className="font-display text-lg sm:text-xl text-[#6F956B] mt-1 block">2,100 L*</span>
+                <span className="font-mono text-[10px] text-[#9A9D91]">Canal-Delay Savings</span>
               </div>
               <div>
-                <span className="block font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase">Food Preserved</span>
-                <span className="font-display text-lg sm:text-xl text-[#C7A45A] mt-1 block">290 KG*</span>
-                <span className="font-mono text-[10px] text-[#9A9D91]">Zero-Waste Rescue</span>
+                <span className="block font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase">Grain Preserved</span>
+                <span className="font-display text-lg sm:text-xl text-[#C7A45A] mt-1 block">700 KG*</span>
+                <span className="font-mono text-[10px] text-[#9A9D91]">State Procurement</span>
               </div>
             </div>
           </div>
@@ -270,13 +278,13 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 bg-[#101510] border border-[#1A241B] items-center">
               <div className="md:col-span-3">
                 <span className="font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase">01. INGESTION</span>
-                <h4 className="font-display text-xl text-[#E8E3D5]">Field Conditions</h4>
+                <h4 className="font-display text-xl text-[#E8E3D5]">Delta Field Conditions</h4>
               </div>
               <div className="md:col-span-6 font-mono text-xs text-[#9A9D91]">
-                Sensors register 27% soil moisture, while radar detects an incoming 78% probability rainfall system.
+                Telemetry registers 42% soil moisture (optimal for tillering), while delta radar detects 25% scattered monsoon showers.
               </div>
               <div className="md:col-span-3 text-right">
-                <span className="font-mono text-xs text-[#6F956B]">FARMSENSE ENGAGED</span>
+                <span className="font-mono text-xs text-[#6F956B]">நிலம் (FARMSENSE) ENGAGED</span>
               </div>
             </div>
 
@@ -284,13 +292,13 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 bg-[#101510] border border-[#1A241B] items-center">
               <div className="md:col-span-3">
                 <span className="font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase">02. PREDICTION</span>
-                <h4 className="font-display text-xl text-[#E8E3D5]">Crop Health & Yield</h4>
+                <h4 className="font-display text-xl text-[#E8E3D5]">Paddy Health & Yield</h4>
               </div>
               <div className="md:col-span-6 font-mono text-xs text-[#9A9D91]">
-                CropGuard evaluates Roma Tomato flowering canopy — 82/100 health index with 1,420 KG projected harvest window in 5–7 days.
+                CropGuard evaluates Thanjavur Ponni Paddy vegetative tillering stand — 92/100 health index with 5,200 KG ML projected harvest.
               </div>
               <div className="md:col-span-3 text-right">
-                <span className="font-mono text-xs text-[#6F956B]">CROPGUARD VERIFIED</span>
+                <span className="font-mono text-xs text-[#6F956B]">வளம் (CROPGUARD) VERIFIED</span>
               </div>
             </div>
 
@@ -301,10 +309,10 @@ export default function Home() {
                 <h4 className="font-display text-xl text-[#E8E3D5]">Market & Surplus</h4>
               </div>
               <div className="md:col-span-6 font-mono text-xs text-[#9A9D91]">
-                MarketMind identifies wholesale market can absorb 950 KG and restaurants 180 KG, detecting a 90 KG perishable surplus.
+                MarketMind identifies wholesale mandi can absorb 4,500 KG and routes 700 KG surplus to State Civil Supplies & grain banks.
               </div>
               <div className="md:col-span-3 text-right">
-                <span className="font-mono text-xs text-[#C7A45A]">MARKETMIND MATCHED</span>
+                <span className="font-mono text-xs text-[#C7A45A]">சந்தை (MARKETMIND) MATCHED</span>
               </div>
             </div>
 
@@ -315,10 +323,10 @@ export default function Home() {
                 <h4 className="font-display text-xl text-[#E8E3D5]">Final Action Plan</h4>
               </div>
               <div className="md:col-span-6 font-mono text-xs text-[#9A9D91]">
-                ActionFlow generates coordinated instructions: Delay irrigation by 8h, prep harvest logistics, and forward contract 90 KG to food rescue.
+                ActionFlow generates coordinated instructions: Maintain canal water depth, prep grain storage, and forward contract 700 KG to state food security.
               </div>
               <div className="md:col-span-3 text-right">
-                <span className="font-mono text-xs text-[#E8E3D5]">ACTIONFLOW EXECUTED</span>
+                <span className="font-mono text-xs text-[#E8E3D5]">செயல் (ACTIONFLOW) EXECUTED</span>
               </div>
             </div>
 
@@ -330,16 +338,16 @@ export default function Home() {
               </div>
               <div className="md:col-span-9 flex flex-wrap items-center justify-between gap-6 font-mono text-xs text-[#E8E3D5]">
                 <div>
-                  <span className="text-[#6F956B] font-display text-lg">1,800 L</span> Water Conserved
+                  <span className="text-[#6F956B] font-display text-lg">2,100 L</span> Water Conserved
                 </div>
                 <div>
-                  <span className="text-[#C7A45A] font-display text-lg">290 KG</span> Food Rescued
+                  <span className="text-[#C7A45A] font-display text-lg">700 KG</span> Grain Rescued
                 </div>
                 <div>
-                  <span className="text-[#E8E3D5] font-display text-lg">₹11,600</span> Value Recovered
+                  <span className="text-[#E8E3D5] font-display text-lg">₹31,500</span> Value Recovered
                 </div>
                 <div>
-                  <span className="text-[#6F956B] font-display text-lg">87 KG</span> CO₂e Averted
+                  <span className="text-[#6F956B] font-display text-lg">210 KG</span> CO₂e Averted
                 </div>
               </div>
             </div>
@@ -392,8 +400,8 @@ export default function Home() {
             <span>FARMFLOW AI — AUTONOMOUS FARM-TO-MARKET INTELLIGENCE</span>
           </div>
           <div className="flex items-center gap-6">
-            <span>VERSION 0.1.0 // PROTOTYPE</span>
-            <span>KARNATAKA, INDIA</span>
+            <span>VERSION 0.1.0 // CAUVERY DELTA</span>
+            <span>THANJAVUR, TAMIL NADU, INDIA</span>
           </div>
         </div>
       </footer>

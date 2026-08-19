@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 
 export default function Navigation() {
   const location = useLocation();
-  const isDashboard = location.pathname === '/dashboard';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#080B08]/90 backdrop-blur-md border-b border-[#1A241B]">
@@ -24,13 +23,13 @@ export default function Navigation() {
         {/* Center Navigation */}
         <div className="hidden md:flex items-center gap-8">
           <a
-            href={isDashboard ? "/#about" : "#about"}
+            href={location.pathname !== '/' ? "/#about" : "#about"}
             className="text-[11px] font-mono tracking-[0.18em] text-[#9A9D91] hover:text-[#E8E3D5] uppercase transition-colors"
           >
             About
           </a>
           <a
-            href={isDashboard ? "/#intelligence" : "#intelligence"}
+            href={location.pathname !== '/' ? "/#intelligence" : "#intelligence"}
             className="text-[11px] font-mono tracking-[0.18em] text-[#9A9D91] hover:text-[#E8E3D5] uppercase transition-colors"
           >
             Intelligence
@@ -38,22 +37,37 @@ export default function Navigation() {
           <Link
             to="/dashboard"
             className={`text-[11px] font-mono tracking-[0.18em] uppercase transition-colors ${
-              isDashboard ? 'text-[#C7A45A] font-medium' : 'text-[#9A9D91] hover:text-[#E8E3D5]'
+              location.pathname === '/dashboard' ? 'text-[#C7A45A] font-medium' : 'text-[#9A9D91] hover:text-[#E8E3D5]'
             }`}
           >
             Command Center
           </Link>
+          <Link
+            to="/try-demo"
+            className={`text-[11px] font-mono tracking-[0.18em] uppercase transition-colors ${
+              location.pathname === '/try-demo' ? 'text-[#6F956B] font-medium' : 'text-[#9A9D91] hover:text-[#E8E3D5]'
+            }`}
+          >
+            Try Demo
+          </Link>
         </div>
 
-        {/* Right Status */}
+        {/* Right Status & Try Demo CTA */}
         <div className="flex items-center gap-3">
           <Link
-            to="/dashboard"
-            className="hidden sm:inline-flex md:hidden text-[10px] font-mono tracking-widest text-[#E8E3D5] border border-[#28382A] px-3 py-1.5 hover:border-[#315F38] transition-colors"
+            to="/try-demo"
+            className={`text-[10px] font-mono tracking-[0.2em] px-3.5 py-1.5 border transition-all duration-300 flex items-center gap-2 group ${
+              location.pathname === '/try-demo'
+                ? 'bg-[#102B18] border-[#6F956B] text-[#E8E3D5] shadow-[0_0_15px_rgba(111,149,107,0.3)]'
+                : 'bg-[#101510] border-[#315F38] hover:border-[#6F956B] text-[#E8E3D5] hover:bg-[#102B18] hover:shadow-[0_0_15px_rgba(49,95,56,0.3)]'
+            }`}
           >
-            DASHBOARD →
+            <span className="w-1.5 h-1.5 rounded-full bg-[#6F956B] animate-pulse" />
+            <span className="font-semibold">TRY DEMO</span>
+            <span className="text-[#6F956B] group-hover:translate-x-0.5 transition-transform hidden sm:inline">→</span>
           </Link>
-          <div className="flex items-center gap-2 pl-3 sm:border-l sm:border-[#1A241B]">
+
+          <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-[#1A241B]">
             <div className="w-1.5 h-1.5 rounded-full bg-[#6F956B] animate-status-dot" />
             <span className="text-[9px] font-mono tracking-[0.22em] text-[#6F956B] uppercase font-medium">
               Live System

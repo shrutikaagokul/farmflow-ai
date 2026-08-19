@@ -245,3 +245,24 @@ class TestOutputStructure:
         result = analyze(_telemetry(soil_moisture=27))
         assert result.telemetry_summary is not None
         assert result.telemetry_summary["soil_moisture"] == 27
+
+
+# ==================================================================
+# SCENARIO 6: Critical Drought & Stage Normalization
+# ==================================================================
+class TestCriticalDroughtAndNormalization:
+    """Tests for critical drought handling, heatwave limits, and case sensitivity."""
+
+    def test_critical_drought_delay_capped_under_heat(self):
+        """Soil < 15% and Temp > 35°C with rain should cap delay to at most 3h."""
+        result = analyze(_telemetry(soil_moisture=12, rain_probability=60, temperature=39))
+        assert result.irrigation_decision == DECISION_DELAY
+        assert result.delay_hours <= 3
+        assert "critical" in result.reason.lower() or "shortened" in result.reason.lower()
+
+    def test_case_insensitive_crop_stage(self):
+        """Lower-case crop stage should correctly resolve water savings multiplier."""
+        result_lower = analyze(_telemetry(crop_stage="flowering"))
+        result_title = analyze(_telemetry(crop_stage="Flowering"))
+        assert result_lower.water_saved_l == result_title.water_saved_l
+        assert result_lower.water_saved_l > 0

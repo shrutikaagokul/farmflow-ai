@@ -32,21 +32,38 @@ from agents.farmsense.config import (
     DEFAULT_STAGE_MULTIPLIER,
     MAX_DELAY_HOURS,
     MIN_DELAY_HOURS,
+    CRITICAL_SOIL_MOISTURE_THRESHOLD,
+    EXTREME_HEAT_THRESHOLD,
+    HIGH_TEMP_THRESHOLD,
+    LOW_HUMIDITY_THRESHOLD,
+    BASE_WATER_USAGE_L_PER_ACRE,
+    DEFAULT_FARM_ACRES,
+    CROP_STAGE_WATER_MULTIPLIER,
+    DEFAULT_STAGE_MULTIPLIER,
+    MAX_DELAY_HOURS,
+    MIN_DELAY_HOURS,
     DECISION_IRRIGATE,
     DECISION_DELAY,
     DECISION_NO_ACTION,
 )
 
 
-def _calculate_delay_hours(rain_probability: float) -> int:
+def _calculate_delay_hours(rain_probability: float, soil_moisture: float = 30.0, temperature: float = 25.0) -> int:
     """
     Estimate how many hours to delay irrigation.
 
     Higher rain probability → shorter delay (rain arrives sooner).
+    Critical dry soil (<15%) + high heat (>35°C) → caps delay to protect roots.
     Clamped to [MIN_DELAY_HOURS, MAX_DELAY_HOURS].
     """
     raw = MAX_DELAY_HOURS - (rain_probability / 100) * (MAX_DELAY_HOURS - MIN_DELAY_HOURS)
-    return max(MIN_DELAY_HOURS, min(MAX_DELAY_HOURS, round(raw)))
+    delay = max(MIN_DELAY_HOURS, min(MAX_DELAY_HOURS, round(raw)))
+
+    # If soil is in severe drought under high heat, cap delay to at most 3 hours
+    if soil_moisture < CRITICAL_SOIL_MOISTURE_THRESHOLD and temperature > HIGH_TEMP_THRESHOLD:
+        delay = min(delay, 3)
+
+    return delay
 
 
 def _calculate_water_saved(crop_stage: str) -> int:
@@ -55,11 +72,10 @@ def _calculate_water_saved(crop_stage: str) -> int:
 
     Formula:
         water_saved = BASE_WATER_USAGE_L_PER_ACRE × FARM_ACRES × stage_multiplier
-
-    This is a hackathon prototype estimate, not a scientific model.
-    The calculation is intentionally simple and configurable.
     """
-    multiplier = CROP_STAGE_WATER_MULTIPLIER.get(crop_stage, DEFAULT_STAGE_MULTIPLIER)
+    # Case-insensitive stage lookup
+    normalized_stage = crop_stage.strip().capitalize()
+    multiplier = CROP_STAGE_WATER_MULTIPLIER.get(normalized_stage, DEFAULT_STAGE_MULTIPLIER)
     return round(BASE_WATER_USAGE_L_PER_ACRE * DEFAULT_FARM_ACRES * multiplier)
 
 
@@ -77,7 +93,12 @@ def _build_reason(
             f"High rain probability detected ({telemetry.rain_probability:.0f}%). "
             f"Delaying irrigation by ~{delay_hours}h to conserve water."
         )
-        if telemetry.soil_moisture < SOIL_MOISTURE_LOW_THRESHOLD:
+        if telemetry.soil_moisture < CRITICAL_SOIL_MOISTURE_THRESHOLD:
+            parts.append(
+                f"Warning: Soil moisture is critically low ({telemetry.soil_moisture:.0f}%). "
+                f"Delay is shortened to {delay_hours}h; monitor closely if rain is delayed."
+            )
+        elif telemetry.soil_moisture < SOIL_MOISTURE_LOW_THRESHOLD:
             parts.append(
                 f"Soil moisture is low ({telemetry.soil_moisture:.0f}%) "
                 f"but natural precipitation is expected."
@@ -89,7 +110,16 @@ def _build_reason(
             f"and rain probability is low ({telemetry.rain_probability:.0f}%). "
             f"Irrigation recommended."
         )
-        if telemetry.temperature > HIGH_TEMP_THRESHOLD:
+        if telemetry.soil_moisture < CRITICAL_SOIL_MOISTURE_THRESHOLD:
+            parts.append(
+                f"Critical drought condition detected ({telemetry.soil_moisture:.0f}% soil moisture)."
+            )
+        if telemetry.temperature > EXTREME_HEAT_THRESHOLD:
+            parts.append(
+                f"Extreme heat temperature ({telemetry.temperature:.0f}°C) "
+                f"severely accelerates evapotranspiration — irrigation is urgent."
+            )
+        elif telemetry.temperature > HIGH_TEMP_THRESHOLD:
             parts.append(
                 f"High temperature ({telemetry.temperature:.0f}°C) "
                 f"increases evapotranspiration — irrigation is urgent."
@@ -149,7 +179,11 @@ def make_decision(telemetry: FarmTelemetry) -> FarmSenseResponse:
 
     elif soil_is_low and rain_is_likely:
         decision = DECISION_DELAY
-        delay_hours = _calculate_delay_hours(telemetry.rain_probability)
+        delay_hours = _calculate_delay_hours(
+            telemetry.rain_probability,
+            telemetry.soil_moisture,
+            telemetry.temperature
+        )
         water_saved = _calculate_water_saved(telemetry.crop_stage)
 
     else:

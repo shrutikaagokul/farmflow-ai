@@ -377,3 +377,62 @@ def test_new_validations():
     # negative price
     with pytest.raises(ValueError):
         run_marketmind({"expected_yield_kg": 100, "price_per_kg": -1.5})
+
+
+# ==================================================================
+# NEW TESTS: EXPANDED CROPS & VALUE AT RISK
+# ==================================================================
+def test_expanded_crop_prices_and_value_at_risk():
+    """Verify newly supported crops like chili and cotton get correct pricing and calculate value at risk."""
+    res_chili = run_marketmind({
+        "expected_yield_kg": 500,
+        "crop": "Chili",
+        "destinations": {"market_a": 300}
+    })
+    assert res_chili["price_per_kg"] == 80.0
+    assert res_chili["surplus_kg"] == 200
+    assert res_chili["remaining_unallocated_kg"] == 200
+    assert res_chili["economic_value_at_risk_inr"] == 200 * 80.0
+
+def test_zero_destinations_all_at_risk():
+    """When no destinations are configured, 100% of yield is surplus and at risk."""
+    res = run_marketmind({
+        "expected_yield_kg": 1000,
+        "crop": "Tomato",
+        "destinations": {}
+    })
+    assert res["surplus_kg"] == 1000
+    assert res["remaining_unallocated_kg"] == 1000
+    assert res["waste_risk_level"] == "HIGH"
+    assert res["economic_value_at_risk_inr"] == 1000 * 40.0
+    assert "No commercial destinations configured" in res["decision_reason"]
+
+
+# ==================================================================
+# NEW TESTS: EXPLICIT MARKET DEMAND INPUT
+# ==================================================================
+def test_explicit_market_demand_creates_surplus():
+    """When expected_yield = 800 and market_demand = 500, surplus should be 300 kg."""
+    res = run_marketmind({
+        "expected_yield_kg": 800,
+        "market_demand": 500,
+        "crop": "Tomato",
+    })
+    assert res["surplus_kg"] == 300.0
+    assert res["market_demand_kg"] == 500.0
+    assert res["surplus_percentage"] == round((300.0 / 800.0) * 100, 2)
+    assert res["remaining_unallocated_kg"] == 300.0
+    assert res["economic_value_at_risk_inr"] == 300.0 * 40.0
+
+def test_explicit_market_demand_exceeds_yield_no_surplus():
+    """When expected_yield = 800 and market_demand = 1200, surplus should be 0 kg."""
+    res = run_marketmind({
+        "expected_yield_kg": 800,
+        "market_demand": 1200,
+        "crop": "Tomato",
+    })
+    assert res["surplus_kg"] == 0.0
+    assert res["surplus_level"] == "BALANCED"
+    assert res["waste_risk_level"] in ("NONE", "LOW")
+    assert res["remaining_unallocated_kg"] == 0.0
+    assert res["recommended_action"] == "NORMAL_MARKET_ALLOCATION"

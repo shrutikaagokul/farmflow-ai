@@ -281,12 +281,22 @@ def compute_disease_risk(farm: FarmInput) -> DiseaseRisk:
 
 
 # ---------------------------------------------------------------------------
-# Main prediction entry point
+# ML Model Integration & Main prediction entry point
 # ---------------------------------------------------------------------------
+from .ml_model import ml_engine, CropYieldHealthML
 
-def predict(farm: FarmInput, farmsense: FarmSenseInput | None = None) -> CropGuardOutput:
+
+def predict(
+    farm: FarmInput,
+    farmsense: FarmSenseInput | None = None,
+    use_ml_if_available: bool = True,
+) -> CropGuardOutput:
     """
     Run the full CropGuard prediction pipeline.
+
+    Dual-Engine Architecture:
+        1. Trained ML Model (Primary when dataset is trained)
+        2. Deterministic Agronomic Domain Engine (Fallback when no ML weights file exists)
 
     Parameters
     ----------
@@ -294,12 +304,40 @@ def predict(farm: FarmInput, farmsense: FarmSenseInput | None = None) -> CropGua
         Validated telemetry from FarmSense / shared contract.
     farmsense : FarmSenseInput | None
         Optional structured FarmSense output (Agent 1).
+    use_ml_if_available : bool
+        Whether to utilize trained ML weights if available.
 
     Returns
     -------
     CropGuardOutput
         Structured prediction result matching the shared output contract.
     """
+    # ── Check for Trained ML Component ─────────────────────────────────
+    if use_ml_if_available and ml_engine.is_trained():
+        # Agronomic models for health, stress, window, disease
+        health_score = compute_crop_health(farm)
+        health_score = apply_farmsense_adjustment(health_score, farmsense)
+        stress_level = compute_stress_level(health_score)
+
+        # ML Model for expected yield
+        if health_score == 0:
+            expected_yield_kg = 0.0
+        else:
+            ml_yield = ml_engine.predict_yield(farm, farmsense)
+            expected_yield_kg = ml_yield if ml_yield is not None else compute_expected_yield(farm, health_score)
+
+        harvest_window = compute_harvest_window(farm)
+        disease_risk = compute_disease_risk(farm)
+
+        return CropGuardOutput(
+            crop_health=health_score,
+            stress_level=stress_level,
+            expected_yield_kg=expected_yield_kg,
+            harvest_window=harvest_window,
+            disease_risk=disease_risk,
+        )
+
+    # ── Fallback: Deterministic Agronomic Domain Predictor ──────────────
     # Step 1 — Crop health score
     health_score = compute_crop_health(farm)
 

@@ -58,6 +58,13 @@ def run_marketmind(input_data):
     if crop is not None and not isinstance(crop, str):
         raise ValueError("crop must be a string")
 
+    market_demand = input_data.get("market_demand")
+    if market_demand is not None:
+        if not isinstance(market_demand, (int, float)) or isinstance(market_demand, bool):
+            raise ValueError("market_demand must be a number")
+        if market_demand < 0:
+            raise ValueError("market_demand cannot be negative")
+
     price_per_kg = input_data.get("price_per_kg")
     if price_per_kg is not None:
         if not isinstance(price_per_kg, (int, float)) or isinstance(price_per_kg, bool):
@@ -77,6 +84,15 @@ def run_marketmind(input_data):
             alternative_destinations[name] = capacity
         else:
             normal_destinations[name] = capacity
+
+    # If explicit market_demand was provided, override or configure normal commercial demand
+    if market_demand is not None:
+        if normal_destinations:
+            # Scale or assign primary commercial market to the explicit market_demand
+            primary_key = list(normal_destinations.keys())[0]
+            normal_destinations = {primary_key: float(market_demand)}
+        else:
+            normal_destinations = {"market_a": float(market_demand)}
 
     # Helper function to format destination names
     def format_destination_name(key):
@@ -181,18 +197,23 @@ def run_marketmind(input_data):
         waste_risk_level = "HIGH"
 
     # ==================================================
-    # 3. ECONOMIC VALUE RECOVERED
+    # 3. ECONOMIC VALUE RECOVERED & AT RISK
     # ==================================================
-    # Fallback crop pricing map (hackathon prototype values)
+    # Comprehensive crop pricing map matching all supported crops
     default_crop_prices = {
         "tomato": 40.0,
         "potato": 30.0,
         "onion": 35.0,
         "rice": 45.0,
         "wheat": 30.0,
+        "maize": 28.0,
+        "cotton": 65.0,
+        "sugarcane": 20.0,
+        "soybean": 50.0,
+        "chili": 80.0,
         "banana": 25.0,
         "carrot": 35.0,
-        "cabbage": 30.0
+        "cabbage": 30.0,
     }
 
     if price_per_kg is None:
@@ -202,6 +223,15 @@ def run_marketmind(input_data):
             price_per_kg = 30.0
 
     economic_value_recovered_inr = round(food_rescued * price_per_kg, 2)
+    economic_value_at_risk_inr = round(remaining_unallocated * price_per_kg, 2)
+
+    # Clean rounding for output serialization
+    initial_surplus = round(initial_surplus, 2)
+    food_rescued = round(food_rescued, 2)
+    waste_avoided = round(waste_avoided, 2)
+    remaining_unallocated = round(remaining_unallocated, 2)
+    surplus_percentage = round(surplus_percentage, 2)
+    waste_risk_percentage = round(waste_risk_percentage, 2)
 
     # ==================================================
     # 4. RECOMMENDED ACTION
@@ -228,14 +258,17 @@ def run_marketmind(input_data):
         if isinstance(val, float) and val.is_integer():
             return int(val)
         return round(val, 2)
+
     if expected_yield == 0:
         decision_reason = "No harvest available for allocation."
     elif initial_surplus == 0:
         decision_reason = "Harvest matches commercial demand. No surplus detected."
+    elif len(destinations) == 0:
+        decision_reason = f"No commercial destinations configured. 100% of {format_num(expected_yield)} kg harvest is at risk without rescue routing."
     elif food_rescued > 0 and remaining_unallocated == 0:
         decision_reason = f"{format_num(initial_surplus)} kg surplus detected. All surplus can be redirected through rescue channels, preventing estimated food waste."
     elif remaining_unallocated > 0:
-        decision_reason = f"{format_num(remaining_unallocated)} kg remains unallocated after all available destinations are filled. Additional rescue capacity is required."
+        decision_reason = f"{format_num(remaining_unallocated)} kg remains unallocated after all available destinations are filled. Additional rescue capacity is required (₹{format_num(economic_value_at_risk_inr)} at risk)."
     else:
         decision_reason = f"Surplus of {format_num(initial_surplus)} kg detected with {format_num(remaining_unallocated)} kg unallocated."
 
@@ -251,6 +284,8 @@ def run_marketmind(input_data):
         "waste_risk_level": waste_risk_level,
         "price_per_kg": price_per_kg,
         "economic_value_recovered_inr": economic_value_recovered_inr,
+        "economic_value_at_risk_inr": economic_value_at_risk_inr,
+        "market_demand_kg": round(total_normal_demand, 2),
         "recommended_action": recommended_action,
-        "decision_reason": decision_reason
+        "decision_reason": decision_reason,
     }

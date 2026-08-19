@@ -1,10 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import FieldBackground from '../components/FieldBackground';
+import FarmImpactKPI from '../components/FarmImpactKPI';
+import SmartCropRotation from '../components/SmartCropRotation';
 import {
   initialFarmProfile,
-  defaultTelemetry,
+  fieldTelemetry,
   weatherSimulationTelemetry,
+  marketSimulationTelemetry,
   defaultAgents,
   weatherSimulationAgents,
   marketSimulationAgents,
@@ -34,15 +38,145 @@ export default function Dashboard() {
   const [isSimulatingSignal, setIsSimulatingSignal] = useState(false);
   const [activeSignalStage, setActiveSignalStage] = useState(0);
 
-  // Dynamic Data States
-  const [telemetry, setTelemetry] = useState(defaultTelemetry);
+  // Dynamic Data States (Initialized with Thanjavur Paddy Telemetry Abstraction)
+  const [telemetry, setTelemetry] = useState(fieldTelemetry);
   const [agents, setAgents] = useState(defaultAgents);
   const [actionPlan, setActionPlan] = useState(defaultActionPlan);
   const [harvestDestinations, setHarvestDestinations] = useState(defaultHarvestDestinations);
   const [impactMetrics, setImpactMetrics] = useState(defaultImpactMetrics);
   const [streamLogs, setStreamLogs] = useState(defaultIntelligenceStream);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [livePipeline, setLivePipeline] = useState(null);
 
   const streamEndRef = useRef(null);
+
+  // Fallback pipeline structure for immediate rendering
+  const fallbackPipeline = {
+    farmsense: { water_saved_l: 2100, irrigation_decision: 'NO_ACTION' },
+    cropguard: { expected_yield_kg: telemetry.expectedYield || 5200, crop_health: 92, stress_level: 'LOW' },
+    marketmind: {
+      food_rescued_kg: 700,
+      economic_value_recovered_inr: 31500,
+      economic_value_at_risk_inr: 0,
+      waste_avoided_kg: 700,
+      market_demand_kg: telemetry.marketDemand || 4500,
+    },
+  };
+
+  // Query Real Backend 4-Agent Pipeline
+  const fetchLiveAgentPipeline = async (currentTelemetry) => {
+    try {
+      const payload = {
+        temperature: Number(currentTelemetry.temperature),
+        humidity: Number(currentTelemetry.humidity),
+        soil_moisture: Number(currentTelemetry.soilMoisture),
+        rain_probability: Number(currentTelemetry.rainProbability),
+        wind_speed: Number(currentTelemetry.windSpeed),
+        crop: currentTelemetry.crop || 'Rice',
+        crop_stage: currentTelemetry.cropStage || 'Vegetative',
+        market_demand: Number(currentTelemetry.marketDemand || 4500),
+      };
+
+      let res = await fetch('/api/actionflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        res = await fetch('http://localhost:8000/api/actionflow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => null);
+      }
+
+      if (res && res.ok) {
+        const data = await res.json();
+        setIsBackendConnected(true);
+        setLivePipeline(data.pipeline);
+        const p = data.pipeline;
+        const af = data.actionflow;
+
+        setAgents([
+          {
+            id: 'farmsense',
+            name: 'FARMSENSE',
+            tamilName: 'நிலம்',
+            phase: 'SENSE',
+            role: 'Reads Cauvery delta soil + weather telemetry',
+            question: 'Should we irrigate the paddy field?',
+            decision: p.farmsense.irrigation_decision === 'DELAY' ? `DELAY (${p.farmsense.delay_hours}H)` : p.farmsense.irrigation_decision,
+            detail: p.farmsense.reason,
+            status: 'LIVE BACKEND ✓',
+            alert: p.farmsense.irrigation_decision === 'IRRIGATE',
+          },
+          {
+            id: 'cropguard',
+            name: 'CROPGUARD',
+            tamilName: 'வளம்',
+            phase: 'PREDICT',
+            role: 'ML yield prediction & paddy vigor monitoring',
+            question: 'How is the crop health & yield?',
+            decision: `${p.cropguard.stress_level} STRESS`,
+            detail: `${p.cropguard.crop_health}/100 Health • ${p.cropguard.expected_yield_kg?.toLocaleString()} KG Yield`,
+            status: 'ML MODEL ✓',
+            alert: p.cropguard.stress_level === 'HIGH',
+          },
+          {
+            id: 'marketmind',
+            name: 'MARKETMIND',
+            tamilName: 'சந்தை',
+            phase: 'MATCH',
+            role: 'Matches paddy harvest against regional demand',
+            question: 'Where should harvest go?',
+            decision: p.marketmind.surplus_kg > 0 ? `${p.marketmind.surplus_kg?.toLocaleString()} KG SURPLUS` : 'MATCHED BALANCED',
+            detail: `Rescued: ${p.marketmind.food_rescued_kg?.toLocaleString()} KG • ₹${p.marketmind.economic_value_recovered_inr?.toLocaleString()}`,
+            status: 'LIVE BACKEND ✓',
+            alert: p.marketmind.waste_risk_level === 'HIGH',
+          },
+          {
+            id: 'actionflow',
+            name: 'ACTIONFLOW',
+            tamilName: 'செயல்',
+            phase: 'ACT',
+            role: 'Coordinates unified delta farm response',
+            question: 'What is the coordinated action?',
+            decision: `${af.priority_actions?.length || 0} PRIORITIZED ACTIONS`,
+            detail: af.overall_reason,
+            status: 'COORDINATED ✓',
+            alert: af.overall_status === 'CRITICAL',
+          },
+        ]);
+
+        if (af.priority_actions && af.priority_actions.length > 0) {
+          setActionPlan(af.priority_actions.map((act, i) => ({
+            id: `0${act.priority || i + 1}`,
+            title: act.title,
+            impact: act.impact,
+            context: act.reason,
+            priority: act.urgency || 'MEDIUM',
+            source_agents: act.source_agents || ['ACTIONFLOW'],
+          })));
+        }
+      }
+    } catch (e) {
+      console.warn('Live backend query info:', e);
+    }
+  };
+
+  // Run on mount with base telemetry
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      if (isMounted) {
+        await fetchLiveAgentPipeline(fieldTelemetry);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Trigger agent signal propagation animation
   const triggerAgentSignalAnimation = () => {
@@ -76,6 +210,9 @@ export default function Dashboard() {
     setHarvestDestinations(defaultHarvestDestinations);
     setImpactMetrics(weatherSimulationImpactMetrics);
     
+    // Call live backend with weather payload
+    fetchLiveAgentPipeline(weatherSimulationTelemetry);
+
     // Prepend new weather events to the live stream
     setStreamLogs(prev => {
       const existingIds = new Set(prev.map(item => item.id));
@@ -89,11 +226,14 @@ export default function Dashboard() {
     setActiveScenario('market');
     triggerAgentSignalAnimation();
 
-    setTelemetry(defaultTelemetry);
+    setTelemetry(marketSimulationTelemetry);
     setAgents(marketSimulationAgents);
     setActionPlan(marketSimulationActionPlan);
     setHarvestDestinations(marketSimulationHarvestDestinations);
     setImpactMetrics(marketSimulationImpactMetrics);
+
+    // Call live backend with market payload
+    fetchLiveAgentPipeline(marketSimulationTelemetry);
 
     // Prepend new market events to the live stream
     setStreamLogs(prev => {
@@ -109,12 +249,14 @@ export default function Dashboard() {
     setIsSimulatingSignal(false);
     setActiveSignalStage(0);
 
-    setTelemetry(defaultTelemetry);
+    setTelemetry(fieldTelemetry);
     setAgents(defaultAgents);
     setActionPlan(defaultActionPlan);
     setHarvestDestinations(defaultHarvestDestinations);
     setImpactMetrics(defaultImpactMetrics);
     setStreamLogs(defaultIntelligenceStream);
+
+    fetchLiveAgentPipeline(fieldTelemetry);
   };
 
   return (
@@ -142,17 +284,27 @@ export default function Dashboard() {
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 font-mono text-xs">
+            <Link
+              to="/try-demo"
+              className="px-4 py-2 bg-[#102B18] border border-[#315F38] hover:border-[#6F956B] hover:bg-[#315F38] text-[#E8E3D5] text-[10px] tracking-[0.2em] uppercase font-semibold flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(49,95,56,0.2)] group"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-[#6F956B] animate-pulse" />
+              <span>TRY DEMO</span>
+              <span className="text-[#6F956B] group-hover:translate-x-0.5 transition-transform">→</span>
+            </Link>
             <div className="px-4 py-2 bg-[#101510] border border-[#1A241B] flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-[#6F956B] animate-status-dot" />
-              <span className="text-[#9A9D91] text-[10px] tracking-wider uppercase">System Active</span>
+              <span className="text-[#9A9D91] text-[10px] tracking-wider uppercase">
+                {isBackendConnected ? 'LIVE 4-AGENT API ACTIVE' : 'TELEMETRY SNAPSHOT ACTIVE'}
+              </span>
             </div>
             <div className="px-4 py-2 bg-[#101510] border border-[#1A241B] flex items-center gap-3">
               <span className="text-[#9A9D91] text-[10px] tracking-wider uppercase">Scenario:</span>
               <span className={`text-[11px] font-medium tracking-wider uppercase ${
                 activeScenario === 'weather' ? 'text-[#6F956B]' : activeScenario === 'market' ? 'text-[#C7A45A]' : 'text-[#E8E3D5]'
               }`}>
-                {activeScenario === 'default' ? 'Base Baseline' : activeScenario === 'weather' ? 'Weather Storm Alert' : 'Market Surplus Shift'}
+                {activeScenario === 'default' ? 'Base Baseline' : activeScenario === 'weather' ? 'Delta Storm Alert' : 'Market Surplus Shift'}
               </span>
             </div>
           </div>
@@ -166,14 +318,14 @@ export default function Dashboard() {
           <div className="flex items-baseline justify-between mb-8">
             <div>
               <span className="font-mono text-[10px] text-[#6F956B] tracking-[0.25em] uppercase block mb-1">
-                01 // LIVE TELEMETRY
+                01 // FIELD TELEMETRY SNAPSHOT
               </span>
               <h2 className="font-display text-3xl sm:text-4xl text-[#E8E3D5]">
                 THE FIELD RIGHT NOW
               </h2>
             </div>
             <span className="font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase hidden sm:block">
-              ROMA HERITAGE TOMATO • PLOT A-D
+              PONNI SAMBA PADDY • PLOT 1-4 • CAUVERY DELTA
             </span>
           </div>
 
@@ -191,7 +343,7 @@ export default function Dashboard() {
                     {telemetry.soilMoisture}%
                   </span>
                   <span className="font-mono text-xs text-[#6F956B]">
-                    {activeScenario === 'weather' ? '↑ +9% INCOMING' : 'STABLE'}
+                    {activeScenario === 'weather' ? '↑ +16% MONSOON' : 'OPTIMAL'}
                   </span>
                 </div>
               </div>
@@ -203,7 +355,7 @@ export default function Dashboard() {
                 <div className="w-full bg-[#080B08] h-1.5 mt-3 border border-[#1A241B]">
                   <div
                     className="h-full bg-[#315F38] transition-all duration-700"
-                    style={{ width: `${telemetry.soilMoisture}%` }}
+                    style={{ width: `${Math.min(100, telemetry.soilMoisture)}%` }}
                   />
                 </div>
               </div>
@@ -213,7 +365,7 @@ export default function Dashboard() {
             <div className="md:col-span-4 p-8 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[260px]">
               <div>
                 <span className="font-mono text-[10px] text-[#9A9D91] tracking-[0.2em] uppercase block mb-2">
-                  Crop Health Index
+                  Paddy Crop Health Index
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="font-display text-6xl sm:text-7xl text-[#E8E3D5] tracking-tight">
@@ -271,13 +423,13 @@ export default function Dashboard() {
 
               <div className="p-4 bg-[#101510] border border-[#1A241B] flex items-center justify-between">
                 <div>
-                  <span className="font-mono text-[9px] text-[#9A9D91] tracking-widest uppercase block">Expected Yield</span>
+                  <span className="font-mono text-[9px] text-[#9A9D91] tracking-widest uppercase block">ML Expected Yield</span>
                   <span className="font-display text-3xl text-[#C7A45A]">
                     {telemetry.expectedYield.toLocaleString()} <span className="text-xs font-mono">{telemetry.yieldUnit}</span>
                   </span>
                 </div>
                 <span className="font-mono text-[10px] text-[#6F956B] text-right">
-                  Window: 5–7 Days
+                  Paddy (Ponni)
                 </span>
               </div>
             </div>
@@ -289,9 +441,9 @@ export default function Dashboard() {
             <div>WIND: <span className="text-[#E8E3D5]">{telemetry.windSpeed} {telemetry.windUnit}</span></div>
             <div>HUMIDITY: <span className="text-[#E8E3D5]">{telemetry.humidity}%</span></div>
             <div>STAGE: <span className="text-[#E8E3D5]">{telemetry.cropStage}</span></div>
-            <div>UV INDEX: <span className="text-[#E8E3D5]">{telemetry.uvIndex}</span></div>
+            <div>LOCATION: <span className="text-[#E8E3D5]">THANJAVUR (TN)</span></div>
             <div>SOIL PH: <span className="text-[#E8E3D5]">{telemetry.soilPh}</span></div>
-            <div>CANOPY: <span className="text-[#6F956B]">OPTIMAL</span></div>
+            <div>STATUS: <span className="text-[#6F956B]">TELEMETRY SNAPSHOT</span></div>
           </div>
         </section>
 
@@ -310,13 +462,13 @@ export default function Dashboard() {
               </h2>
             </div>
             <div className="font-mono text-[10px] text-[#9A9D91] flex items-center gap-2">
-              <span className="text-[#6F956B]">SENSE</span>
+              <span className="text-[#6F956B]">நிலம் (SENSE)</span>
               <span>→</span>
-              <span className="text-[#6F956B]">PREDICT</span>
+              <span className="text-[#6F956B]">வளம் (PREDICT)</span>
               <span>→</span>
-              <span className="text-[#C7A45A]">MATCH</span>
+              <span className="text-[#C7A45A]">சந்தை (MATCH)</span>
               <span>→</span>
-              <span className="text-[#E8E3D5]">ACT</span>
+              <span className="text-[#E8E3D5]">செயல் (ACT)</span>
             </div>
           </div>
 
@@ -346,12 +498,12 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Agent Name */}
+                    {/* Agent Name with Tamil prominence */}
                     <div className="mb-1">
-                      <h3 className="font-display text-2xl text-[#E8E3D5] tracking-wide leading-tight">
-                        {agentTamilNames[agent.id] || agent.name}
+                      <h3 className="font-tamil text-3xl text-[#E8E3D5] tracking-wide leading-tight">
+                        {agentTamilNames[agent.id] || agent.tamilName || agent.name}
                       </h3>
-                      <span className="font-mono text-[10px] text-[#9A9D91] tracking-[0.2em] uppercase block mt-0.5">
+                      <span className="font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase block mt-0.5 font-semibold">
                         {agent.name}
                       </span>
                     </div>
@@ -370,7 +522,7 @@ export default function Dashboard() {
                     }`}>
                       {agent.decision}
                     </div>
-                    <div className="font-mono text-[10px] text-[#6F956B] mt-0.5">
+                    <div className="font-mono text-[10px] text-[#6F956B] mt-0.5 line-clamp-2">
                       {agent.detail}
                     </div>
                   </div>
@@ -385,7 +537,7 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-4 flex items-center justify-between font-mono text-[10px] text-[#9A9D91]">
-            <span>SIGNAL PROPAGATION LATENCY: &lt;14MS</span>
+            <span>THANJAVUR CAUVERY DELTA DEPLOYMENT // MULTI-AGENT SYNCHRONIZATION</span>
             <span className="text-[#6F956B]">AUTONOMOUS CONSENSUS VERIFIED</span>
           </div>
         </section>
@@ -407,7 +559,7 @@ export default function Dashboard() {
             <div className="font-mono text-xs text-[#9A9D91] max-w-sm">
               <span className="text-[#E8E3D5] font-semibold">THE AGENTS THINK. FARMFLOW DECIDES.</span>
               <br />
-              All downstream valve controls, staging windows, and zero-waste contracts are automatically synchronized.
+              All canal sluice controls, vegetative tillering care, and grain procurement contracts are automatically synchronized.
             </div>
           </div>
 
@@ -427,7 +579,7 @@ export default function Dashboard() {
                 <div className="md:col-span-4">
                   <div className="flex items-center gap-2">
                     <span className={`font-mono text-[9px] px-2 py-0.5 border ${
-                      action.priority === 'HIGH' ? 'border-[#C7A45A] text-[#C7A45A]' : 'border-[#1A241B] text-[#9A9D91]'
+                      action.priority === 'HIGH' ? 'border-[#C7A45A] text-[#C7A45A]' : action.priority === 'LOW' ? 'border-[#1A241B] text-[#9A9D91]/60' : 'border-[#1A241B] text-[#9A9D91]'
                     }`}>
                       {action.priority} PRIORITY
                     </span>
@@ -442,9 +594,32 @@ export default function Dashboard() {
                   {action.impact}
                 </div>
 
-                {/* Context Details */}
-                <div className="md:col-span-4 font-mono text-[11px] text-[#9A9D91] leading-relaxed">
-                  {action.context}
+                {/* Context + Source Agents */}
+                <div className="md:col-span-4">
+                  <div className="font-mono text-[11px] text-[#9A9D91] leading-relaxed">
+                    {action.context}
+                  </div>
+                  {action.source_agents && action.source_agents.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-[#1A241B]/50">
+                      <span className="font-mono text-[8px] text-[#9A9D91]/60 tracking-widest uppercase mr-1">SOURCE</span>
+                      {action.source_agents.map((agent) => (
+                        <span
+                          key={agent}
+                          className={`font-mono text-[8px] px-1.5 py-0.5 tracking-wider uppercase ${
+                            agent === 'FARMSENSE' ? 'bg-[#102B18] text-[#6F956B] border border-[#1A241B]' :
+                            agent === 'CROPGUARD' ? 'bg-[#102B18] text-[#6F956B] border border-[#1A241B]' :
+                            agent === 'MARKETMIND' ? 'bg-[#2B2310] text-[#C7A45A] border border-[#2B2310]' :
+                            'bg-[#101510] text-[#9A9D91] border border-[#1A241B]'
+                          }`}
+                        >
+                          {agent === 'FARMSENSE' ? 'நிலம் (FARMSENSE)' :
+                           agent === 'CROPGUARD' ? 'வளம் (CROPGUARD)' :
+                           agent === 'MARKETMIND' ? 'சந்தை (MARKETMIND)' :
+                           agent === 'ACTIONFLOW' ? 'செயல் (ACTIONFLOW)' : agent}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -459,7 +634,7 @@ export default function Dashboard() {
           <div className="flex items-baseline justify-between mb-8">
             <div>
               <span className="font-mono text-[10px] text-[#6F956B] tracking-[0.25em] uppercase block mb-1">
-                04 // ZERO-WASTE SUPPLY CHAIN
+                04 // ZERO-WASTE GRAIN SUPPLY CHAIN
               </span>
               <h2 className="font-display text-3xl sm:text-4xl text-[#E8E3D5]">
                 WHERE THE HARVEST GOES
@@ -476,8 +651,8 @@ export default function Dashboard() {
             {/* Visual Continuous Allocation Bar */}
             <div>
               <div className="flex justify-between font-mono text-[10px] text-[#9A9D91] mb-2 uppercase tracking-wider">
-                <span>Farm Output (1,420 KG)</span>
-                <span>Autonomous Demand Balancing</span>
+                <span>Paddy Output ({harvestDestinations.totalHarvest.toLocaleString()} KG)</span>
+                <span>Autonomous Delta Demand Balancing</span>
               </div>
               <div className="w-full h-3 bg-[#080B08] flex overflow-hidden border border-[#1A241B]">
                 {harvestDestinations.channels.map((channel) => (
@@ -527,7 +702,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center justify-between font-mono text-[10px] text-[#9A9D91] pt-2">
-              <span>ZERO PERISHABLE SURPLUS DIVERTED TO LANDFILL</span>
+              <span>ZERO GRAIN SPOILAGE DIVERTED TO WASTE</span>
               <span className="text-[#C7A45A]">100% ACCOUNTED PRODUCTION</span>
             </div>
           </div>
@@ -598,6 +773,18 @@ export default function Dashboard() {
 
 
         {/* =========================================================================
+            SECTION 06 — FARM IMPACT & BUSINESS VALUE KPI
+            ========================================================================= */}
+        <FarmImpactKPI pipeline={livePipeline || fallbackPipeline} submittedInput={telemetry} />
+
+
+        {/* =========================================================================
+            SECTION 07 — SMART CROP ROTATION RECOMMENDATION (DECISION SUPPORT)
+            ========================================================================= */}
+        <SmartCropRotation crop={telemetry.crop || 'Rice'} telemetry={telemetry} />
+
+
+        {/* =========================================================================
             INTELLIGENCE STREAM + SCENARIO CONTROLS
             ========================================================================= */}
         <section className="py-14 grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -623,12 +810,12 @@ export default function Dashboard() {
                   className="flex items-start gap-4 py-1.5 border-b border-[#1A241B]/40 animate-feed-item"
                 >
                   <span className="text-[#9A9D91] text-[10px] shrink-0 mt-0.5">{log.time}</span>
-                  <span className={`text-[10px] font-bold shrink-0 tracking-wider w-24 ${
+                  <span className={`text-[10px] font-bold shrink-0 tracking-wider w-28 ${
                     log.agent === 'FARMSENSE' ? 'text-[#6F956B]' :
                     log.agent === 'CROPGUARD' ? 'text-[#6F956B]' :
                     log.agent === 'MARKETMIND' ? 'text-[#C7A45A]' : 'text-[#E8E3D5]'
                   }`}>
-                    {log.agent}
+                    {log.tamilName ? `${log.tamilName} (${log.agent})` : log.agent}
                   </span>
                   <span className="text-[#E8E3D5]/90 text-[11px] leading-relaxed">
                     {log.event}
@@ -646,45 +833,45 @@ export default function Dashboard() {
                 SCENARIO CONTROL
               </span>
               <span className="font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase">
-                HACKATHON DEMO
+                THANJAVUR DELTA
               </span>
             </div>
 
             <div className="p-6 bg-[#101510] border border-[#1A241B] space-y-4">
               <p className="font-mono text-xs text-[#9A9D91] leading-relaxed">
-                Trigger real-time dynamic environmental or demand disturbances to watch the four-agent loop adjust decisions autonomously:
+                Trigger real-time dynamic environmental or market disturbances on the Thanjavur paddy deployment to watch the four-agent loop adjust decisions autonomously:
               </p>
 
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleSimulateWeather}
-                  className={`w-full py-3.5 px-4 font-mono text-xs tracking-[0.15em] uppercase text-left flex items-center justify-between border transition-all ${
+                  className={`w-full py-3.5 px-4 font-mono text-xs tracking-[0.15em] uppercase text-left flex items-center justify-between border transition-all cursor-pointer ${
                     activeScenario === 'weather'
                       ? 'bg-[#102B18] border-[#6F956B] text-[#E8E3D5]'
                       : 'bg-[#080B08] border-[#1A241B] text-[#9A9D91] hover:border-[#315F38] hover:text-[#E8E3D5]'
                   }`}
                 >
-                  <span>1. SIMULATE WEATHER CHANGE</span>
-                  <span className="text-[10px] text-[#6F956B]">Rain 78% → 85%</span>
+                  <span>1. SIMULATE MONSOON STORM</span>
+                  <span className="text-[10px] text-[#6F956B]">Rain 25% → 85%</span>
                 </button>
 
                 <button
                   onClick={handleSimulateMarket}
-                  className={`w-full py-3.5 px-4 font-mono text-xs tracking-[0.15em] uppercase text-left flex items-center justify-between border transition-all ${
+                  className={`w-full py-3.5 px-4 font-mono text-xs tracking-[0.15em] uppercase text-left flex items-center justify-between border transition-all cursor-pointer ${
                     activeScenario === 'market'
                       ? 'bg-[#2B2310] border-[#C7A45A] text-[#E8E3D5]'
                       : 'bg-[#080B08] border-[#1A241B] text-[#9A9D91] hover:border-[#C7A45A] hover:text-[#E8E3D5]'
                   }`}
                 >
-                  <span>2. SIMULATE MARKET CHANGE</span>
-                  <span className="text-[10px] text-[#C7A45A]">Surplus 90 → 250 KG</span>
+                  <span>2. SIMULATE MANDI DEMAND SHIFT</span>
+                  <span className="text-[10px] text-[#C7A45A]">Surplus 700 → 2,400 KG</span>
                 </button>
 
                 <button
                   onClick={handleResetScenario}
-                  className="w-full py-3 px-4 bg-[#080B08] border border-[#1A241B] text-[#9A9D91] hover:text-[#E8E3D5] hover:border-[#9A9D91] font-mono text-xs tracking-[0.15em] uppercase text-center transition-all"
+                  className="w-full py-3 px-4 bg-[#080B08] border border-[#1A241B] text-[#9A9D91] hover:text-[#E8E3D5] hover:border-[#9A9D91] font-mono text-xs tracking-[0.15em] uppercase text-center transition-all cursor-pointer"
                 >
-                  RESET SCENARIO
+                  RESET TO THANJAVUR BASELINE
                 </button>
               </div>
 
@@ -692,17 +879,17 @@ export default function Dashboard() {
               <div className="pt-3 border-t border-[#1A241B] font-mono text-[10px] text-[#9A9D91]/70">
                 {activeScenario === 'weather' && (
                   <span className="text-[#6F956B]">
-                    ✓ Storm front detected. FarmSense locks irrigation (2,400 L saved), CropGuard flags wind advisory, ActionFlow adapts harvest prep.
+                    ✓ Delta storm front verified. FarmSense locks canal sluice gates (3,200 L conserved), CropGuard triggers drainage monitoring, ActionFlow adapts grain warehouse protection.
                   </span>
                 )}
                 {activeScenario === 'market' && (
                   <span className="text-[#C7A45A]">
-                    ✓ Wholesale demand contracted. MarketMind routes 250 KG surplus to Food Rescue and Community Kitchens (₹18,400 value saved).
+                    ✓ Local wholesale mandi demand contracted. MarketMind automatically routes 2,400 KG surplus paddy to State Civil Supplies and Food Banks (₹1,08,000 value preserved).
                   </span>
                 )}
                 {activeScenario === 'default' && (
                   <span>
-                    Baseline state: Autonomous monitoring active across soil, weather, crop, and commercial channels.
+                    Baseline state: Autonomous monitoring active across Cauvery delta soil, weather, tillering growth, and regional procurement channels.
                   </span>
                 )}
               </div>
@@ -724,7 +911,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-6">
             <span>AUTONOMOUS MULTI-AGENT PROTOCOL</span>
-            <span>SIMULATION DEMO</span>
+            <span>THANJAVUR, TAMIL NADU, INDIA</span>
           </div>
         </div>
       </footer>

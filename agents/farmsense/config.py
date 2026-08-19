@@ -15,6 +15,7 @@ sensible demo behavior for a 24-hour hackathon.
 # Below this value, soil moisture is considered "low" and irrigation
 # may be needed.
 SOIL_MOISTURE_LOW_THRESHOLD = 35
+CRITICAL_SOIL_MOISTURE_THRESHOLD = 15  # Below this, soil is in severe drought stress
 
 # ------------------------------------------------------------------
 # Rain Probability Thresholds (percentage, 0–100)
@@ -29,6 +30,7 @@ RAIN_PROBABILITY_HIGH_THRESHOLD = 50
 # Above this temperature, crops experience heat stress and may need
 # more urgent irrigation even if other factors suggest delay.
 HIGH_TEMP_THRESHOLD = 35
+EXTREME_HEAT_THRESHOLD = 38  # Severe heatwave condition requiring urgent intervention
 
 # ------------------------------------------------------------------
 # Humidity Thresholds (percentage, 0–100)
