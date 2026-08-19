@@ -223,8 +223,11 @@ def run_marketmind(input_data):
     # 5. HUMAN-READABLE DECISION REASON
     # ==================================================
     def format_num(val):
-        return int(val) if isinstance(val, (int, float)) and val.is_integer() else round(val, 2)
-
+        if isinstance(val, int):
+            return val
+        if isinstance(val, float) and val.is_integer():
+            return int(val)
+        return round(val, 2)
     if expected_yield == 0:
         decision_reason = "No harvest available for allocation."
     elif initial_surplus == 0:
