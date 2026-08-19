@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import FieldBackground from '../components/FieldBackground';
 import FarmImpactKPI from '../components/FarmImpactKPI';
@@ -31,6 +32,24 @@ const agentTamilNames = {
   marketmind: 'சந்தை',
   actionflow: 'செயல்',
 };
+
+function AuthWelcome() {
+  const { isAuthenticated, user, isDemo } = useAuth();
+  if (!isAuthenticated) return null;
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className={`w-2 h-2 rounded-full ${user?.role === 'fpo' ? 'bg-[#6F956B]' : 'bg-[#C7A45A]'}`} />
+      <span className="font-mono text-[10px] text-[#9A9D91] tracking-[0.2em] uppercase">
+        Welcome, <span className="text-[#E8E3D5]">{user?.name || 'User'}</span>
+      </span>
+      {isDemo && (
+        <span className="px-1.5 py-0.5 bg-[#C7A45A]/20 text-[#C7A45A] text-[7px] tracking-wider rounded-sm font-mono uppercase">
+          Demo
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   // Scenario state: 'default' | 'weather' | 'market'
@@ -266,6 +285,9 @@ export default function Dashboard() {
 
       {/* Main Command Center Operational Flow */}
       <main className="relative z-10 pt-20 md:pt-24 pb-24 max-w-[1440px] mx-auto px-6 md:px-12 lg:px-16">
+
+        {/* Authenticated FPO Welcome */}
+        <AuthWelcome />
         
         {/* =========================================================================
             COMMAND CENTER HEADER

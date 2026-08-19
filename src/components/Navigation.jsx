@@ -1,8 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navigation() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user, isDemo, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#080B08]/90 backdrop-blur-md border-b border-[#1A241B]">
@@ -37,7 +45,9 @@ export default function Navigation() {
           <Link
             to="/dashboard"
             className={`text-[11px] font-mono tracking-[0.18em] uppercase transition-colors ${
-              location.pathname === '/dashboard' ? 'text-[#C7A45A] font-medium' : 'text-[#9A9D91] hover:text-[#E8E3D5]'
+              location.pathname === '/dashboard' || location.pathname === '/dashboard/fpo'
+                ? 'text-[#C7A45A] font-medium'
+                : 'text-[#9A9D91] hover:text-[#E8E3D5]'
             }`}
           >
             Command Center
@@ -52,8 +62,9 @@ export default function Navigation() {
           </Link>
         </div>
 
-        {/* Right Status & Try Demo CTA */}
+        {/* Right: Try Demo CTA + Login/User */}
         <div className="flex items-center gap-3">
+          {/* Try Demo Button */}
           <Link
             to="/try-demo"
             className={`text-[10px] font-mono tracking-[0.2em] px-3.5 py-1.5 border transition-all duration-300 flex items-center gap-2 group ${
@@ -67,6 +78,45 @@ export default function Navigation() {
             <span className="text-[#6F956B] group-hover:translate-x-0.5 transition-transform hidden sm:inline">→</span>
           </Link>
 
+          {/* Login / User Info */}
+          {!isAuthenticated ? (
+            <Link
+              to="/login"
+              className={`text-[10px] font-mono tracking-[0.2em] px-3.5 py-1.5 border transition-all duration-300 flex items-center gap-2 ${
+                location.pathname === '/login'
+                  ? 'bg-[#102B18] border-[#C7A45A]/60 text-[#C7A45A]'
+                  : 'bg-[#101510] border-[#1A241B] hover:border-[#C7A45A]/40 text-[#9A9D91] hover:text-[#E8E3D5]'
+              }`}
+            >
+              <span className="font-semibold">LOGIN</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 px-3 py-1.5 bg-[#101510] border border-[#1A241B] hover:border-[#315F38] transition-all"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${user?.role === 'fpo' ? 'bg-[#6F956B]' : 'bg-[#C7A45A]'}`} />
+                <span className="font-mono text-[10px] text-[#E8E3D5] tracking-wider hidden sm:inline">
+                  {user?.name || 'User'}
+                </span>
+                {isDemo && (
+                  <span className="px-1 py-0.5 bg-[#C7A45A]/20 text-[#C7A45A] text-[7px] tracking-wider rounded-sm">
+                    DEMO
+                  </span>
+                )}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="px-2.5 py-1.5 bg-[#101510] border border-[#1A241B] hover:border-[#8F3E3E]/50 text-[#9A9D91] hover:text-[#E8E3D5] font-mono text-[10px] tracking-wider transition-all"
+                title="Logout"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* System Status */}
           <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-[#1A241B]">
             <div className="w-1.5 h-1.5 rounded-full bg-[#6F956B] animate-status-dot" />
             <span className="text-[9px] font-mono tracking-[0.22em] text-[#6F956B] uppercase font-medium">

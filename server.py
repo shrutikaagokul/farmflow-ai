@@ -27,12 +27,18 @@ from agents.cropguard.predictor import predict as cropguard_predict
 from agents.cropguard.model import FarmInput, FarmSenseInput
 from agents.marketmind.marketmind import run_marketmind
 from agents.actionflow.logic import run_actionflow
+from auth.routes import router as auth_router
 
 app = FastAPI(
     title="FarmFlow AI — Agent API",
     description="Multi-agent precision agriculture backend. SENSE → PREDICT → MATCH → ACT.",
     version="1.0.0",
 )
+
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 
 # ---------------------------------------------------------------------------
 # CORS — allow the Vite frontend (or any client) to call the API
