@@ -3,13 +3,28 @@ import React from 'react';
 export default function FieldBackground() {
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-      {/* Background grid */}
-      <div className="absolute inset-0 bg-field-grid opacity-60" />
-      <div className="absolute inset-0 bg-field-rows opacity-40" />
+      {/* 1. Full-Screen Brightened Backdrop Image */}
+      <img
+        src="/field-backdrop.jpg"
+        alt="FarmFlow Agricultural Field Backdrop"
+        className="absolute inset-0 w-full h-full object-cover object-center transform scale-105 filter brightness-[0.78] contrast-[1.02] saturate-[0.95]"
+      />
 
-      {/* Subtle aerial agricultural geometry SVG */}
+      {/* 2. Soft Dark-Green Tint Layer (Preserves Golden Sunrise & Field Detail) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#080B08]/65 via-[#0D1C11]/35 to-[#080B08]/75 mix-blend-multiply" />
+
+      {/* 3. Soft Translucent Dimmer */}
+      <div className="absolute inset-0 bg-[#080B08]/30" />
+
+      {/* 4. Soft Vignette for Edge Feathering */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,#080B08_85%)]" />
+
+      {/* 5. Precision Grid & Contour Geometry Overlay */}
+      <div className="absolute inset-0 bg-field-grid opacity-25 mix-blend-overlay" />
+      <div className="absolute inset-0 bg-field-rows opacity-15" />
+
       <svg
-        className="absolute inset-0 w-full h-full opacity-[0.035]"
+        className="absolute inset-0 w-full h-full opacity-[0.05]"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 1440 900"
         preserveAspectRatio="none"
@@ -21,23 +36,19 @@ export default function FieldBackground() {
           </linearGradient>
         </defs>
 
-        {/* Contour lines representing field elevation and plot partitions */}
         <path d="M-100,200 Q400,100 900,350 T1600,280" fill="none" stroke="url(#fieldGrad)" strokeWidth="1" />
         <path d="M-100,350 Q450,260 950,500 T1600,420" fill="none" stroke="url(#fieldGrad)" strokeWidth="1" />
         <path d="M-100,500 Q500,420 1000,650 T1600,580" fill="none" stroke="url(#fieldGrad)" strokeWidth="1" />
         <path d="M-100,650 Q550,580 1050,800 T1600,720" fill="none" stroke="url(#fieldGrad)" strokeWidth="1" />
 
-        {/* Diagonal parcel lines */}
         <line x1="200" y1="0" x2="350" y2="900" stroke="#315F38" strokeWidth="0.75" strokeDasharray="6 12" />
         <line x1="680" y1="0" x2="850" y2="900" stroke="#315F38" strokeWidth="0.75" strokeDasharray="4 8" />
         <line x1="1100" y1="0" x2="1280" y2="900" stroke="#315F38" strokeWidth="0.75" strokeDasharray="6 12" />
       </svg>
 
-      {/* Vignette overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,#080B08_95%)]" />
-
-      {/* Grain overlay */}
-      <div className="absolute inset-0 bg-grain pointer-events-none opacity-40" />
+      {/* 6. Subtle Film Texture */}
+      <div className="absolute inset-0 bg-grain pointer-events-none opacity-20" />
     </div>
   );
 }
+

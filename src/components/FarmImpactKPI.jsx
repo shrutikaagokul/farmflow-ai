@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { calculateFarmImpact, KPI_METADATA } from '../utils/farmImpact';
 
-export default function FarmImpactKPI({ pipeline, submittedInput = {} }) {
+export default function FarmImpactKPI({ pipeline, submittedInput = {}, compact = true }) {
   const [selectedKpiForModal, setSelectedKpiForModal] = useState(null);
   const impact = calculateFarmImpact(pipeline, submittedInput);
 
@@ -18,143 +18,117 @@ export default function FarmImpactKPI({ pipeline, submittedInput = {} }) {
     return `${Math.round(rawValue).toLocaleString()} ${KPI_METADATA.find(k => k.key === key)?.unit || ''}`;
   };
 
+  // The 4 High-Value Executive Metrics for compact mode
+  const EXECUTIVE_METRICS = [
+    { key: 'waterSavedL', label: 'WATER SAVED', sourceTag: 'FarmSense' },
+    { key: 'produceRescuedKg', label: 'PRODUCE RESCUED', sourceTag: 'MarketMind' },
+    { key: 'economicValueRecovered', label: 'VALUE RECOVERED', sourceTag: 'MarketMind' },
+    { key: 'estimatedTimeSavedHrs', label: 'TIME SAVED', sourceTag: 'Automation' },
+  ];
+
+  const displayedList = compact ? EXECUTIVE_METRICS : KPI_METADATA;
+
   return (
-    <section className="py-14 border-b border-[#1A241B] animate-feed-item">
-      {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+    <section className="py-8 border-b border-[#1A241B]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 bg-[#C7A45A]" />
-            <span className="font-mono text-[10px] text-[#C7A45A] tracking-[0.3em] uppercase font-medium">
-              MEASURABLE BUSINESS IMPACT // AUDIT
-            </span>
-          </div>
-          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl text-[#E8E3D5]">
-            FARM IMPACT & VALUE GENERATION
+          <span className="font-mono text-xs sm:text-sm text-[#6F956B] tracking-[0.25em] uppercase font-semibold block">
+            BUSINESS IMPACT
+          </span>
+          <h2 className="font-display text-2xl sm:text-3xl text-[#E8E3D5] mt-0.5">
+            FARM IMPACT
           </h2>
-          <p className="font-mono text-xs text-[#9A9D91] mt-2 max-w-2xl">
-            Calculated metrics derived directly from the 4-agent decision pipeline. Measure what FarmFlow saves, recovers, and protects.
-          </p>
         </div>
 
         <button
           onClick={() => setSelectedKpiForModal('ALL')}
-          className="px-4 py-2 bg-[#101510] border border-[#1A241B] hover:border-[#6F956B] text-[#E8E3D5] font-mono text-[10px] tracking-[0.2em] uppercase flex items-center gap-2 transition-all cursor-pointer"
+          className="px-3 py-1.5 bg-[#101510] border border-[#1A241B] hover:border-[#6F956B] text-[#9A9D91] hover:text-[#E8E3D5] font-mono text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
         >
-          <span className="text-[#6F956B]">ⓘ</span>
-          <span>HOW IS THIS CALCULATED?</span>
+          <span>ⓘ</span>
+          <span>Details</span>
         </button>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {KPI_METADATA.map((meta) => {
-          const val = impact[meta.key];
-          const formatted = formatValue(meta.key, val);
+      <div className={`grid gap-4 ${compact ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+        {displayedList.map((item) => {
+          const meta = KPI_METADATA.find((k) => k.key === item.key) || item;
+          const val = impact[item.key];
+          const formatted = formatValue(item.key, val);
+          const sourceTag = item.sourceTag || meta.source?.split(' ')[0] || 'Pipeline';
 
           return (
             <div
-              key={meta.key}
-              className="p-6 bg-[#101510] border border-[#1A241B] hover:border-[#315F38] transition-all flex flex-col justify-between min-h-[220px] relative group"
+              key={item.key}
+              className="p-5 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[130px] hover:border-[#315F38] transition-colors group cursor-pointer"
+              onClick={() => setSelectedKpiForModal(item.key)}
             >
-              <div>
-                {/* Header Badge Strip */}
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#1A241B]/60">
-                  <span className="font-mono text-[9px] text-[#9A9D91] tracking-[0.2em] uppercase font-bold">
-                    {meta.label}
-                  </span>
-                  <span
-                    className="font-mono text-[8px] px-2 py-0.5 tracking-wider uppercase border border-[#1A241B] rounded-none"
-                    style={{ color: meta.badgeColor, backgroundColor: `${meta.badgeColor}15` }}
-                  >
-                    {meta.source}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold">
+                  {meta.label || item.label}
+                </span>
+                <span className="font-mono text-xs text-[#6F956B] px-2 py-0.5 bg-[#102B18] border border-[#1A241B] rounded-none font-semibold">
+                  {sourceTag}
+                </span>
+              </div>
 
-                {/* Main Large Value */}
-                <div className="my-2">
-                  <div className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight">
-                    {formatted}
-                  </div>
-                  {meta.isEstimated && (
-                    <span className="font-mono text-[9px] text-[#9A9D91]/70 uppercase tracking-widest block mt-1">
-                      [CALCULATED ESTIMATE]
-                    </span>
-                  )}
-                </div>
+              <div className="font-display text-3xl sm:text-4xl text-[#E8E3D5] tracking-tight my-2">
+                {formatted}
+              </div>
 
-                {/* Explanation */}
-                <p className="font-mono text-[11px] text-[#9A9D91] leading-relaxed mt-2">
+              {!compact && meta.explanation && (
+                <p className="font-mono text-[11px] text-[#9A9D91] leading-relaxed mt-1">
                   {meta.explanation}
                 </p>
-              </div>
-
-              {/* Card Footer Interaction */}
-              <div className="pt-3 mt-4 border-t border-[#1A241B]/50 flex items-center justify-between">
-                <span className="font-mono text-[9px] text-[#9A9D91]/60 tracking-wider">
-                  PIPELINE DERIVED
-                </span>
-                <button
-                  onClick={() => setSelectedKpiForModal(meta.key)}
-                  className="font-mono text-[9px] text-[#6F956B] hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <span>Formula</span>
-                  <span>→</span>
-                </button>
-              </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Modal: How is this calculated? */}
+      {/* Transparent Formula Modal */}
       {selectedKpiForModal && (
         <div className="fixed inset-0 z-50 bg-[#080B08]/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101510] border border-[#315F38] max-w-2xl w-full p-6 sm:p-8 space-y-6 text-[#E8E3D5] max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-[#1A241B]">
-              <div>
-                <span className="font-mono text-[10px] text-[#6F956B] tracking-[0.25em] uppercase font-bold block">
-                  TRANSPARENT FORMULA SPECIFICATION
-                </span>
-                <h3 className="font-display text-2xl text-[#E8E3D5] mt-1">
-                  KPI Calculation & Derivation Logic
-                </h3>
-              </div>
+          <div className="bg-[#101510] border border-[#315F38] max-w-xl w-full p-6 space-y-5 text-[#E8E3D5] max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1A241B]">
+              <h3 className="font-display text-xl text-[#E8E3D5]">
+                Impact Calculation Details
+              </h3>
               <button
                 onClick={() => setSelectedKpiForModal(null)}
-                className="font-mono text-xs px-3 py-1 bg-[#1A241B] text-[#9A9D91] hover:text-[#E8E3D5] border border-[#1A241B] cursor-pointer"
+                className="font-mono text-xs px-2.5 py-1 bg-[#1A241B] text-[#9A9D91] hover:text-[#E8E3D5] border border-[#1A241B] cursor-pointer"
               >
-                ✕ CLOSE
+                ✕
               </button>
             </div>
 
-            <div className="space-y-4 font-mono text-xs">
+            <div className="space-y-3 font-mono text-xs">
               {(selectedKpiForModal === 'ALL'
                 ? KPI_METADATA
                 : KPI_METADATA.filter((k) => k.key === selectedKpiForModal)
               ).map((meta) => (
-                <div key={meta.key} className="p-4 bg-[#080B08] border border-[#1A241B] space-y-2">
+                <div key={meta.key} className="p-3.5 bg-[#080B08] border border-[#1A241B] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-[#E8E3D5]">{meta.label} ({meta.unit})</span>
+                    <span className="font-bold text-[#E8E3D5] text-sm">{meta.label} ({meta.unit})</span>
                     <span className="text-[10px] text-[#6F956B]">{meta.source}</span>
                   </div>
                   <div className="text-[11px] text-[#C7A45A] font-semibold bg-[#2B2310]/50 p-2 border border-[#2B2310]">
                     Formula: {meta.formula}
                   </div>
-                  <p className="text-[10px] text-[#9A9D91] leading-relaxed">
+                  <p className="text-[11px] text-[#9A9D91] leading-relaxed">
                     {meta.explanation}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="pt-4 border-t border-[#1A241B] font-mono text-[10px] text-[#9A9D91] flex items-center justify-between">
-              <span>* ALL VALUES ARE PROJECTED FROM PIPELINE SIMULATION TELEMETRY</span>
+            <div className="pt-3 border-t border-[#1A241B] flex justify-end">
               <button
                 onClick={() => setSelectedKpiForModal(null)}
-                className="px-4 py-2 bg-[#315F38] text-[#E8E3D5] font-semibold uppercase tracking-wider cursor-pointer"
+                className="px-4 py-1.5 bg-[#315F38] text-[#E8E3D5] font-mono text-xs uppercase tracking-wider cursor-pointer"
               >
-                GOT IT
+                Close
               </button>
             </div>
           </div>

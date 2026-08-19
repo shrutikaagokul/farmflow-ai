@@ -28,27 +28,14 @@ const SUPPORTED_STAGES = [
   'Harvest',
 ];
 
-// Quick Scenarios (only populates the form; still executes against real backend)
+// Quick Scenarios — Interactive AI Simulation Controls
 const QUICK_SCENARIOS = [
   {
-    id: 'dry-field',
-    name: 'Dry Paddy Field',
-    desc: 'Low delta soil moisture, low rain → Triggers urgent irrigation',
-    data: {
-      crop: 'Rice',
-      crop_stage: 'Vegetative',
-      temperature: 34,
-      humidity: 45,
-      soil_moisture: 18,
-      rain_probability: 10,
-      wind_speed: 12,
-      market_demand: 5000,
-    },
-  },
-  {
-    id: 'rain-incoming',
-    name: 'Delta Monsoon',
-    desc: 'Heavy Cauvery Delta rain forecast → Locks irrigation inlet to conserve water',
+    id: 'monsoon-storm',
+    name: 'MONSOON STORM',
+    desc: 'Monsoon Storm → increases rain probability',
+    impact: 'Rain probability → 85%',
+    accentColor: '#6F956B',
     data: {
       crop: 'Rice',
       crop_stage: 'Vegetative',
@@ -61,33 +48,54 @@ const QUICK_SCENARIOS = [
     },
   },
   {
-    id: 'heat-stress',
-    name: 'Heatwave Stress',
-    desc: 'Extreme delta temperature + dry soil → Triggers critical vegetative crop stress alert',
+    id: 'mandi-shift',
+    name: 'MANDI DEMAND SHIFT',
+    desc: 'Mandi Demand Shift → changes buyer demand',
+    impact: 'Buyer demand → 2,800 KG',
+    accentColor: '#C7A45A',
+    data: {
+      crop: 'Rice',
+      crop_stage: 'Vegetative',
+      temperature: 32,
+      humidity: 72,
+      soil_moisture: 42,
+      rain_probability: 25,
+      wind_speed: 12,
+      market_demand: 2800,
+    },
+  },
+  {
+    id: 'dry-field',
+    name: 'DRY FIELD HEATWAVE',
+    desc: 'Dry Field → triggers urgent irrigation',
+    impact: 'Soil moisture → 18%',
+    accentColor: '#6F956B',
     data: {
       crop: 'Rice',
       crop_stage: 'Vegetative',
       temperature: 42,
       humidity: 28,
-      soil_moisture: 14,
-      rain_probability: 5,
+      soil_moisture: 18,
+      rain_probability: 10,
       wind_speed: 20,
       market_demand: 4500,
     },
   },
   {
-    id: 'high-surplus',
-    name: 'Paddy Surplus Routing',
-    desc: 'High harvest vs modest demand → Triggers urgent surplus rescue routing to State Civil Supplies',
+    id: 'baseline-reset',
+    name: 'RESET BASELINE',
+    desc: 'Returns everything to original farm state',
+    impact: 'Baseline Telemetry (Rain 85%, Demand 4,500 KG)',
+    accentColor: '#E8E3D5',
     data: {
       crop: 'Rice',
-      crop_stage: 'Ripening',
-      temperature: 30,
-      humidity: 70,
-      soil_moisture: 45,
-      rain_probability: 20,
-      wind_speed: 10,
-      market_demand: 2000,
+      crop_stage: 'Vegetative',
+      temperature: 32,
+      humidity: 72,
+      soil_moisture: 28,
+      rain_probability: 85,
+      wind_speed: 12,
+      market_demand: 4500,
     },
   },
 ];
@@ -96,9 +104,9 @@ const DEFAULT_FORM_VALUES = {
   crop: 'Rice',
   crop_stage: 'Vegetative',
   temperature: 32,
-  humidity: 74,
-  soil_moisture: 42,
-  rain_probability: 25,
+  humidity: 72,
+  soil_moisture: 28,
+  rain_probability: 85,
   wind_speed: 12,
   market_demand: 4500,
 };
@@ -338,80 +346,99 @@ export default function TryDemo() {
           </div>
 
           {/* Quick Scenario Presets */}
-          <div className="mb-8">
-            <span className="font-mono text-[10px] text-[#9A9D91] tracking-wider uppercase block mb-3">
-              QUICK SCENARIO PRESETS:
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {QUICK_SCENARIOS.map((sc) => (
-                <button
-                  key={sc.id}
-                  type="button"
-                  onClick={() => handleSelectScenario(sc)}
-                  className={`p-4 text-left border transition-all cursor-pointer flex flex-col justify-between ${activeScenarioId === sc.id
-                      ? 'bg-[#102B18] border-[#6F956B] text-[#E8E3D5] shadow-[0_0_15px_rgba(49,95,56,0.25)]'
-                      : 'bg-[#101510] border-[#1A241B] text-[#9A9D91] hover:border-[#315F38] hover:text-[#E8E3D5]'
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-mono text-xs text-[#6F956B] tracking-[0.2em] uppercase font-bold">
+                INTERACTIVE SCENARIO SIMULATION CONTROLS
+              </span>
+              <span className="font-mono text-xs text-[#9A9D91]">CLICK TO ACTIVATE STATE</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {QUICK_SCENARIOS.map((sc) => {
+                const isActive = activeScenarioId === sc.id;
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => handleSelectScenario(sc)}
+                    className={`p-6 text-left border transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[165px] relative group ${
+                      isActive
+                        ? 'bg-[#102B18] border-2 border-[#6F956B] text-[#E8E3D5] shadow-[0_0_25px_rgba(111,149,107,0.3)]'
+                        : 'bg-[#101510] border-[#1A241B] text-[#9A9D91] hover:border-[#315F38] hover:bg-[#141C14] hover:text-[#E8E3D5]'
                     }`}
-                >
-                  <div>
-                    <span className="font-mono text-xs font-semibold text-[#E8E3D5] block">
-                      {sc.name}
-                    </span>
-                    <p className="font-mono text-[10px] text-[#9A9D91] mt-1 line-clamp-2">
-                      {sc.desc}
-                    </p>
-                  </div>
-                  <span className="font-mono text-[9px] text-[#6F956B] mt-3 block tracking-wider uppercase">
-                    Load Scenario →
-                  </span>
-                </button>
-              ))}
+                  >
+                    {isActive && (
+                      <div className="absolute -top-3 right-3 px-2 py-0.5 bg-[#C7A45A] text-[#080B08] text-[9px] font-bold tracking-widest uppercase font-mono rounded-sm shadow-sm flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#080B08] animate-pulse" />
+                        ACTIVE SIMULATION
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-display text-lg sm:text-xl font-bold text-[#E8E3D5] tracking-wide">
+                          {sc.name}
+                        </span>
+                      </div>
+                      <p className="font-sans text-xs text-[#9A9D91] leading-relaxed mb-3">
+                        {sc.desc}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#1A241B]/80 flex items-center justify-between font-mono text-xs">
+                      <span className="font-bold text-[#C7A45A]">{sc.impact}</span>
+                      <span className="text-[#6F956B] group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Interactive Manual Form */}
-          <form onSubmit={handleRunAnalysis} className="p-6 sm:p-8 bg-[#101510] border border-[#1A241B] space-y-6">
+          <form onSubmit={handleRunAnalysis} className="p-6 sm:p-10 bg-[#101510] border border-[#1A241B] space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
               {/* Crop Dropdown */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Target Crop *
                 </label>
                 <select
                   name="crop"
                   value={formData.crop}
                   onChange={handleChange}
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 >
                   {SUPPORTED_CROPS.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {formErrors.crop && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.crop}</span>}
+                {formErrors.crop && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.crop}</span>}
               </div>
 
               {/* Crop Stage Dropdown */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Growth Stage *
                 </label>
                 <select
                   name="crop_stage"
                   value={formData.crop_stage}
                   onChange={handleChange}
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 >
                   {SUPPORTED_STAGES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-                {formErrors.crop_stage && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.crop_stage}</span>}
+                {formErrors.crop_stage && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.crop_stage}</span>}
               </div>
 
               {/* Temperature */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Temperature (°C) *
                 </label>
                 <input
@@ -422,14 +449,14 @@ export default function TryDemo() {
                   min="-10"
                   max="60"
                   step="1"
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 />
-                {formErrors.temperature && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.temperature}</span>}
+                {formErrors.temperature && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.temperature}</span>}
               </div>
 
               {/* Humidity */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Humidity (%) *
                 </label>
                 <input
@@ -440,15 +467,15 @@ export default function TryDemo() {
                   min="0"
                   max="100"
                   step="1"
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 />
-                {formErrors.humidity && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.humidity}</span>}
+                {formErrors.humidity && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.humidity}</span>}
               </div>
 
               {/* Soil Moisture */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
-                  Soil Moisture (%) * <span className="text-[#C7A45A] text-[9px]">Threshold: 35%</span>
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
+                  Soil Moisture (%) * <span className="text-[#C7A45A] text-[10px]">Threshold: 35%</span>
                 </label>
                 <input
                   type="number"
@@ -458,15 +485,15 @@ export default function TryDemo() {
                   min="0"
                   max="100"
                   step="1"
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 />
-                {formErrors.soil_moisture && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.soil_moisture}</span>}
+                {formErrors.soil_moisture && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.soil_moisture}</span>}
               </div>
 
               {/* Rain Probability */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
-                  Rain Probability (%) * <span className="text-[#6F956B] text-[9px]">Threshold: 50%</span>
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
+                  Rain Probability (%) * <span className="text-[#6F956B] text-[10px]">Threshold: 50%</span>
                 </label>
                 <input
                   type="number"
@@ -476,14 +503,14 @@ export default function TryDemo() {
                   min="0"
                   max="100"
                   step="1"
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 />
-                {formErrors.rain_probability && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.rain_probability}</span>}
+                {formErrors.rain_probability && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.rain_probability}</span>}
               </div>
 
               {/* Wind Speed */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-2">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Wind Speed (km/h) *
                 </label>
                 <input
@@ -494,14 +521,14 @@ export default function TryDemo() {
                   min="0"
                   max="200"
                   step="1"
-                  className="w-full px-3.5 py-2.5 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-xs rounded-none outline-none"
+                  className="w-full px-4 py-3 bg-[#080B08] border border-[#1A241B] focus:border-[#6F956B] text-[#E8E3D5] font-mono text-sm sm:text-base rounded-none outline-none"
                 />
-                {formErrors.wind_speed && <span className="font-mono text-[10px] text-[#8F3E3E] mt-1 block">{formErrors.wind_speed}</span>}
+                {formErrors.wind_speed && <span className="font-mono text-xs text-[#8F3E3E] mt-1 block">{formErrors.wind_speed}</span>}
               </div>
 
               {/* Market Demand */}
               <div>
-                <label className="block font-mono text-[10px] text-[#9A9D91] tracking-widest uppercase mb-1">
+                <label className="block font-mono text-xs text-[#9A9D91] tracking-widest uppercase mb-2 font-semibold">
                   Market Demand (kg) *
                 </label>
                 <input
