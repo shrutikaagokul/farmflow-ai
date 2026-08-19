@@ -21,6 +21,13 @@ import {
   marketSimulationStreamEvents,
 } from '../data/mockData';
 
+const agentTamilNames = {
+  farmsense: 'நிலம்',
+  cropguard: 'வளம்',
+  marketmind: 'சந்தை',
+  actionflow: 'செயல்',
+};
+
 export default function Dashboard() {
   // Scenario state: 'default' | 'weather' | 'market'
   const [activeScenario, setActiveScenario] = useState('default');
@@ -340,9 +347,14 @@ export default function Dashboard() {
                     </div>
 
                     {/* Agent Name */}
-                    <h3 className="font-display text-2xl text-[#E8E3D5] tracking-wide mb-1">
-                      {agent.name}
-                    </h3>
+                    <div className="mb-1">
+                      <h3 className="font-display text-2xl text-[#E8E3D5] tracking-wide leading-tight">
+                        {agentTamilNames[agent.id] || agent.name}
+                      </h3>
+                      <span className="font-mono text-[10px] text-[#9A9D91] tracking-[0.2em] uppercase block mt-0.5">
+                        {agent.name}
+                      </span>
+                    </div>
                     <p className="text-[11px] font-mono text-[#9A9D91] mb-6">
                       {agent.role}
                     </p>

@@ -22,6 +22,7 @@
   --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-tamil: 'Noto Serif Tamil', 'DM Serif Display', Georgia, serif;
 }
 
 /* Base resets & smooth rendering */
@@ -65,6 +66,10 @@ body {
 /* Editorial Typography */
 .font-display {
   font-family: var(--font-display);
+}
+
+.font-tamil {
+  font-family: var(--font-tamil);
 }
 
 .font-mono-tech {

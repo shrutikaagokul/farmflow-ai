@@ -4,6 +4,13 @@ import Navigation from '../components/Navigation';
 import FieldBackground from '../components/FieldBackground';
 import { defaultAgents } from '../data/mockData';
 
+const agentTamilNames = {
+  farmsense: 'நிலம்',
+  cropguard: 'வளம்',
+  marketmind: 'சந்தை',
+  actionflow: 'செயல்',
+};
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#080B08] text-[#E8E3D5] relative selection:bg-[#315F38]/40 selection:text-[#E8E3D5]">
@@ -34,7 +41,12 @@ export default function Home() {
               FLOW<span className="text-[#C7A45A]">.</span>
             </h1>
 
-            <div className="mt-8 md:mt-12 max-w-3xl">
+            {/* Tamil Brand Tagline */}
+            <p className="font-tamil text-lg sm:text-xl md:text-2xl lg:text-3xl text-[#C7A45A] font-light tracking-wide italic mt-6 md:mt-8">
+              மண்ணின் மொழி, அறிவின் வழி
+            </p>
+
+            <div className="mt-6 md:mt-8 max-w-3xl">
               <p className="font-display text-2xl sm:text-3xl md:text-4xl text-[#E8E3D5]/90 leading-tight tracking-wide">
                 AUTONOMOUS INTELLIGENCE FOR THE JOURNEY FROM SOIL TO HARVEST TO DESTINATION.
               </p>
@@ -202,9 +214,14 @@ export default function Home() {
                   </div>
 
                   {/* Agent Name */}
-                  <h3 className="font-display text-3xl text-[#E8E3D5] tracking-wide mb-2">
-                    {agent.name}
-                  </h3>
+                  <div className="mb-2">
+                    <h3 className="font-display text-3xl text-[#E8E3D5] tracking-wide leading-tight">
+                      {agentTamilNames[agent.id] || agent.name}
+                    </h3>
+                    <span className="font-mono text-[10px] text-[#9A9D91] tracking-[0.2em] uppercase block mt-1">
+                      {agent.name}
+                    </span>
+                  </div>
                   
                   {/* Responsibility */}
                   <p className="text-xs text-[#9A9D91] font-mono mb-8 leading-relaxed">
