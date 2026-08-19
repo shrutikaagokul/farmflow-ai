@@ -146,8 +146,7 @@ function testScenarioEMarketDemandChange() {
   console.log("✓ Test E: Market Demand Change passed.");
 }
 
-function testEdgeCases() {
-  // 1. Zero destination capacity
+function testLegacyEdgeCases() {
   const inputZero = {
     expected_yield_kg: 100,
     destinations: {
@@ -160,7 +159,6 @@ function testEdgeCases() {
   assert.strictEqual(res.food_rescued_kg, 100);
   assert.deepStrictEqual(res.allocations, [{ destination: "Food Rescue", quantity_kg: 100 }]);
 
-  // 2. Empty destinations list
   const inputEmpty = {
     expected_yield_kg: 500,
     destinations: {}
@@ -171,12 +169,66 @@ function testEdgeCases() {
   assert.strictEqual(resEmpty.remaining_unallocated_kg, 500);
   assert.deepStrictEqual(resEmpty.allocations, []);
 
-  // 3. Invalid inputs
   assert.throws(() => runMarketMind({ expected_yield_kg: -10, destinations: {} }), Error);
   assert.throws(() => runMarketMind({ expected_yield_kg: "large", destinations: {} }), Error);
   assert.throws(() => runMarketMind({ expected_yield_kg: 100, destinations: { market_a: -5 } }), Error);
 
-  console.log("✓ Edge cases passed.");
+  console.log("✓ Legacy Edge cases passed.");
+}
+
+// New tests matching Python
+function testNewClassifications() {
+  // Balanced Harvest
+  let res = runMarketMind({ expected_yield_kg: 1000, destinations: { market_a: 1000 } });
+  assert.strictEqual(res.surplus_percentage, 0.0);
+  assert.strictEqual(res.surplus_level, "BALANCED");
+
+  // Low Surplus
+  res = runMarketMind({ expected_yield_kg: 1100, destinations: { market_a: 1000 } });
+  assert.strictEqual(res.surplus_level, "LOW_SURPLUS");
+
+  // Moderate Surplus
+  res = runMarketMind({ expected_yield_kg: 1250, destinations: { market_a: 1000 } });
+  assert.strictEqual(res.surplus_level, "MODERATE_SURPLUS");
+
+  // Critical Surplus
+  res = runMarketMind({ expected_yield_kg: 1500, destinations: { market_a: 1000 } });
+  assert.strictEqual(res.surplus_level, "CRITICAL_SURPLUS");
+
+  // Zero Harvest
+  res = runMarketMind({ expected_yield_kg: 0, destinations: { market_a: 100 } });
+  assert.strictEqual(res.surplus_level, "BALANCED");
+  assert.strictEqual(res.waste_risk_level, "NONE");
+  assert.strictEqual(res.recommended_action, "NO_HARVEST_AVAILABLE");
+
+  // High Waste Risk
+  res = runMarketMind({ expected_yield_kg: 1500, destinations: { market_a: 1000 } });
+  assert.strictEqual(res.waste_risk_level, "HIGH");
+
+  console.log("✓ New classifications passed.");
+}
+
+function testEconomicPricing() {
+  // Default Tomato
+  let res = runMarketMind({ expected_yield_kg: 1200, crop: "Tomato", destinations: { market_a: 1000, food_rescue: 200 } });
+  assert.strictEqual(res.price_per_kg, 40.0);
+  assert.strictEqual(res.economic_value_recovered_inr, 8000.0);
+
+  // Explicit overrides
+  res = runMarketMind({ expected_yield_kg: 1200, crop: "Tomato", price_per_kg: 50.0, destinations: { market_a: 1000, food_rescue: 200 } });
+  assert.strictEqual(res.price_per_kg, 50.0);
+  assert.strictEqual(res.economic_value_recovered_inr, 10000.0);
+
+  // Default unknown
+  res = runMarketMind({ expected_yield_kg: 1200, crop: "DragonFruit", destinations: { market_a: 1000, food_rescue: 200 } });
+  assert.strictEqual(res.price_per_kg, 30.0);
+
+  // Validations
+  assert.throws(() => runMarketMind({ expected_yield_kg: 100, crop: 123 }), Error);
+  assert.throws(() => runMarketMind({ expected_yield_kg: 100, price_per_kg: "free" }), Error);
+  assert.throws(() => runMarketMind({ expected_yield_kg: 100, price_per_kg: -20 }), Error);
+
+  console.log("✓ Economic pricing and validation passed.");
 }
 
 // Run all test cases
@@ -186,7 +238,9 @@ try {
   testScenarioCLargeSurplus();
   testScenarioDLowHarvest();
   testScenarioEMarketDemandChange();
-  testEdgeCases();
+  testLegacyEdgeCases();
+  testNewClassifications();
+  testEconomicPricing();
   console.log("\nALL JS TESTS PASSED SUCCESSFULLY!");
 } catch (error) {
   console.error("Test failure:", error);

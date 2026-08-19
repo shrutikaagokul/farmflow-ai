@@ -1,22 +1,27 @@
 """
 MarketMind Agent
 Matches predicted harvest with destination demand/capacity, detects surplus,
-and routes surplus to alternative rescue channels to minimize food waste.
+routes surplus to alternative rescue channels, estimates waste risk,
+calculates economic value recovered, and recommends actions.
 """
 
 def run_marketmind(input_data):
     """
-    Allocates expected harvest quantity to commercial and rescue destinations.
+    Allocates expected harvest quantity to commercial and rescue destinations,
+    performs surplus classification, waste risk evaluation, economic value calculations,
+    and produces explainable recommended actions.
     
     Args:
         input_data (dict): Dictionary containing:
             - expected_yield_kg (float/int): The predicted harvest quantity.
             - destinations (dict): Dictionary mapping destination names to their demand/capacity.
+            - crop (str, optional): The name of the crop.
+            - price_per_kg (float/int, optional): The crop price per kg in INR.
             
     Returns:
         dict: Structured decision output matching the FarmFlow contract.
     """
-    # 1. Validation and Graceful Handling of missing/empty inputs
+    # 1. Input Validation
     if not isinstance(input_data, dict):
         raise ValueError("Input data must be a dictionary")
         
@@ -24,7 +29,7 @@ def run_marketmind(input_data):
     if expected_yield is None:
         raise ValueError("Missing required field: expected_yield_kg")
         
-    if not isinstance(expected_yield, (int, float)):
+    if not isinstance(expected_yield, (int, float)) or isinstance(expected_yield, bool):
         raise ValueError("expected_yield_kg must be a number")
         
     if expected_yield < 0:
@@ -42,15 +47,25 @@ def run_marketmind(input_data):
     for k, v in dest_input.items():
         if v is None:
             continue
-        if not isinstance(v, (int, float)):
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
             raise ValueError(f"Capacity for destination '{k}' must be a number")
         if v < 0:
             raise ValueError(f"Capacity for destination '{k}' cannot be negative")
         destinations[k] = v
 
+    # Optional input validations
+    crop = input_data.get("crop")
+    if crop is not None and not isinstance(crop, str):
+        raise ValueError("crop must be a string")
+
+    price_per_kg = input_data.get("price_per_kg")
+    if price_per_kg is not None:
+        if not isinstance(price_per_kg, (int, float)) or isinstance(price_per_kg, bool):
+            raise ValueError("price_per_kg must be a number")
+        if price_per_kg < 0:
+            raise ValueError("price_per_kg cannot be negative")
+
     # 2. Classification of destinations
-    # Normal: Markets, Restaurants, etc. (commercial)
-    # Alternative: Food Rescue, NGO, Community Kitchens, etc. (rescue/aid)
     alternative_keywords = ["rescue", "ngo", "community", "kitchen", "alternative", "charity", "donation", "foodbank"]
     
     normal_destinations = {}
@@ -63,9 +78,8 @@ def run_marketmind(input_data):
         else:
             normal_destinations[name] = capacity
 
-    # Helper function to map keys to formatted display names
+    # Helper function to format destination names
     def format_destination_name(key):
-        # Specific mappings
         mapping = {
             "market_a": "Market A",
             "market_b": "Market B",
@@ -79,7 +93,7 @@ def run_marketmind(input_data):
         key_lower = key.lower()
         if key_lower in mapping:
             return mapping[key_lower]
-        # Generic Title Case conversion
+        
         parts = key.replace("_", " ").split()
         formatted = " ".join(p.upper() if p.lower() in ["ngo", "uv", "co2"] else p.capitalize() for p in parts)
         return formatted
@@ -128,16 +142,112 @@ def run_marketmind(input_data):
             total_alternative_allocated += allocated
             
     # Calculations
-    # food_rescued_kg: quantity redirected to rescue/NGO/community
-    # waste_avoided_kg: quantity successfully redirected that would otherwise be waste
     food_rescued = total_alternative_allocated
     waste_avoided = total_alternative_allocated
     remaining_unallocated = remaining_harvest
+
+    # ==================================================
+    # 1. SURPLUS CLASSIFICATION
+    # ==================================================
+    if expected_yield > 0:
+        surplus_percentage = (initial_surplus / expected_yield) * 100
+    else:
+        surplus_percentage = 0.0
+
+    if surplus_percentage == 0:
+        surplus_level = "BALANCED"
+    elif surplus_percentage <= 15:
+        surplus_level = "LOW_SURPLUS"
+    elif surplus_percentage <= 30:
+        surplus_level = "MODERATE_SURPLUS"
+    else:
+        surplus_level = "CRITICAL_SURPLUS"
+
+    # ==================================================
+    # 2. WASTE RISK
+    # ==================================================
+    if expected_yield > 0:
+        waste_risk_percentage = (remaining_unallocated / expected_yield) * 100
+    else:
+        waste_risk_percentage = 0.0
+
+    if waste_risk_percentage == 0:
+        waste_risk_level = "NONE"
+    elif waste_risk_percentage <= 10:
+        waste_risk_level = "LOW"
+    elif waste_risk_percentage <= 25:
+        waste_risk_level = "MODERATE"
+    else:
+        waste_risk_level = "HIGH"
+
+    # ==================================================
+    # 3. ECONOMIC VALUE RECOVERED
+    # ==================================================
+    # Fallback crop pricing map (hackathon prototype values)
+    default_crop_prices = {
+        "tomato": 40.0,
+        "potato": 30.0,
+        "onion": 35.0,
+        "rice": 45.0,
+        "wheat": 30.0,
+        "banana": 25.0,
+        "carrot": 35.0,
+        "cabbage": 30.0
+    }
+
+    if price_per_kg is None:
+        if crop is not None:
+            price_per_kg = default_crop_prices.get(crop.strip().lower(), 30.0)
+        else:
+            price_per_kg = 30.0
+
+    economic_value_recovered_inr = round(food_rescued * price_per_kg, 2)
+
+    # ==================================================
+    # 4. RECOMMENDED ACTION
+    # ==================================================
+    if expected_yield == 0:
+        recommended_action = "NO_HARVEST_AVAILABLE"
+    elif initial_surplus == 0:
+        recommended_action = "NORMAL_MARKET_ALLOCATION"
+    elif remaining_unallocated > 0 and waste_risk_level == "HIGH":
+        recommended_action = "URGENT_SURPLUS_RESCUE"
+    elif food_rescued > 0 and remaining_unallocated == 0:
+        recommended_action = "ROUTE_SURPLUS_TO_FOOD_RESCUE"
+    elif food_rescued > 0 and remaining_unallocated > 0:
+        recommended_action = "ROUTE_REMAINING_SURPLUS_TO_ADDITIONAL_RESCUE"
+    else:
+        recommended_action = "ROUTE_REMAINING_SURPLUS_TO_ADDITIONAL_RESCUE"
+
+    # ==================================================
+    # 5. HUMAN-READABLE DECISION REASON
+    # ==================================================
+    def format_num(val):
+        return int(val) if isinstance(val, (int, float)) and val.is_integer() else round(val, 2)
+
+    if expected_yield == 0:
+        decision_reason = "No harvest available for allocation."
+    elif initial_surplus == 0:
+        decision_reason = "Harvest matches commercial demand. No surplus detected."
+    elif food_rescued > 0 and remaining_unallocated == 0:
+        decision_reason = f"{format_num(initial_surplus)} kg surplus detected. All surplus can be redirected through rescue channels, preventing estimated food waste."
+    elif remaining_unallocated > 0:
+        decision_reason = f"{format_num(remaining_unallocated)} kg remains unallocated after all available destinations are filled. Additional rescue capacity is required."
+    else:
+        decision_reason = f"Surplus of {format_num(initial_surplus)} kg detected with {format_num(remaining_unallocated)} kg unallocated."
 
     return {
         "surplus_kg": initial_surplus,
         "food_rescued_kg": food_rescued,
         "waste_avoided_kg": waste_avoided,
         "remaining_unallocated_kg": remaining_unallocated,
-        "allocations": allocations
+        "allocations": allocations,
+        "surplus_percentage": surplus_percentage,
+        "surplus_level": surplus_level,
+        "waste_risk_percentage": waste_risk_percentage,
+        "waste_risk_level": waste_risk_level,
+        "price_per_kg": price_per_kg,
+        "economic_value_recovered_inr": economic_value_recovered_inr,
+        "recommended_action": recommended_action,
+        "decision_reason": decision_reason
     }
