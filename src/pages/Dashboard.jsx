@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import FieldBackground from '../components/FieldBackground';
@@ -50,6 +51,19 @@ export default function Dashboard() {
     currentDemandKg = parsed <= 100 ? Math.round(1000 + (parsed / 100) * 9000) : parsed;
   }
 
+  const [pipelineHealth, setPipelineHealth] = useState({
+    online_agents: 4,
+    total_agents: 4,
+    status: 'ALL_ONLINE',
+  });
+
+  const [agentStatuses, setAgentStatuses] = useState({
+    farmsense: { status: 'COMPLETED', error: null, message: 'Field conditions analyzed' },
+    cropguard: { status: 'COMPLETED', error: null, message: 'Yield predicted' },
+    marketmind: { status: 'COMPLETED', error: null, message: 'Demand matched' },
+    actionflow: { status: 'DECISION_READY', error: null, message: 'Action plan generated' },
+  });
+
   // Query Real Backend 4-Agent Pipeline
   const fetchLiveAgentPipeline = async (currentTelemetry) => {
     try {
@@ -85,38 +99,54 @@ export default function Dashboard() {
         const p = data.pipeline;
         const af = data.actionflow;
 
+        if (data.pipeline_health) {
+          setPipelineHealth(data.pipeline_health);
+        }
+        if (data.agent_statuses) {
+          setAgentStatuses(data.agent_statuses);
+        }
+
+        const fsStatus = data.agent_statuses?.farmsense?.status || 'COMPLETED';
+        const cgStatus = data.agent_statuses?.cropguard?.status || 'COMPLETED';
+        const mmStatus = data.agent_statuses?.marketmind?.status || 'COMPLETED';
+        const afStatus = data.agent_statuses?.actionflow?.status || 'DECISION_READY';
+
         setAgents([
           {
             id: 'farmsense',
             name: 'FARMSENSE',
             tamilName: 'நிலம்',
             phase: 'SENSE',
-            mainMetric: `${p.farmsense.telemetry_summary?.soil_moisture || currentTelemetry.soilMoisture}% SOIL`,
-            decision: p.farmsense.irrigation_decision === 'DELAY' ? `DELAY (${p.farmsense.delay_hours}H)` : p.farmsense.irrigation_decision,
+            status: fsStatus,
+            mainMetric: fsStatus === 'FAILED' ? 'ERROR' : fsStatus === 'WAITING' ? 'WAITING' : `${p.farmsense?.telemetry_summary?.soil_moisture || currentTelemetry.soilMoisture}% SOIL`,
+            decision: fsStatus === 'FAILED' ? 'Unable to evaluate' : fsStatus === 'WAITING' ? 'Waiting for FarmSense' : p.farmsense?.irrigation_decision === 'DELAY' ? `DELAY (${p.farmsense?.delay_hours}H)` : p.farmsense?.irrigation_decision,
           },
           {
             id: 'cropguard',
             name: 'CROPGUARD',
             tamilName: 'வளம்',
             phase: 'PREDICT',
-            mainMetric: `${p.cropguard.stress_level} STRESS`,
-            decision: `${p.cropguard.expected_yield_kg?.toLocaleString()} KG YIELD`,
+            status: cgStatus,
+            mainMetric: cgStatus === 'FAILED' ? 'ERROR' : cgStatus === 'WAITING' ? 'WAITING' : `${p.cropguard?.stress_level} STRESS`,
+            decision: cgStatus === 'FAILED' ? 'Yield prediction unavailable' : cgStatus === 'WAITING' ? 'Waiting for CropGuard' : `${p.cropguard?.expected_yield_kg?.toLocaleString()} KG YIELD`,
           },
           {
             id: 'marketmind',
             name: 'MARKETMIND',
             tamilName: 'சந்தை',
             phase: 'MATCH',
-            mainMetric: p.marketmind.surplus_kg > 0 ? `${p.marketmind.surplus_kg?.toLocaleString()} KG SURPLUS` : 'BALANCED DEMAND',
-            decision: p.marketmind.economic_value_at_risk_inr > 0 ? `₹${p.marketmind.economic_value_at_risk_inr?.toLocaleString()} AT RISK` : `₹${p.marketmind.economic_value_recovered_inr?.toLocaleString()} RECOVERED`,
+            status: mmStatus,
+            mainMetric: mmStatus === 'FAILED' ? 'ERROR' : mmStatus === 'WAITING' ? 'WAITING' : (p.marketmind?.surplus_kg > 0 ? `${p.marketmind?.surplus_kg?.toLocaleString()} KG SURPLUS` : 'BALANCED DEMAND'),
+            decision: mmStatus === 'FAILED' ? 'Matching unavailable' : mmStatus === 'WAITING' ? 'Waiting for MarketMind' : (p.marketmind?.economic_value_at_risk_inr > 0 ? `₹${p.marketmind?.economic_value_at_risk_inr?.toLocaleString()} AT RISK` : `₹${p.marketmind?.economic_value_recovered_inr?.toLocaleString()} RECOVERED`),
           },
           {
             id: 'actionflow',
             name: 'ACTIONFLOW',
             tamilName: 'செயல்',
             phase: 'ACT',
-            mainMetric: `${af.priority_actions?.length || 1} PRIORITY ACTION${(af.priority_actions?.length || 1) > 1 ? 'S' : ''}`,
-            decision: 'DECISION READY',
+            status: afStatus,
+            mainMetric: afStatus === 'FAILED' ? 'ERROR' : afStatus === 'WAITING' ? 'PAUSED' : `${af.priority_actions?.length || 1} PRIORITY ACTION${(af.priority_actions?.length || 1) > 1 ? 'S' : ''}`,
+            decision: afStatus === 'FAILED' ? 'Unable to generate action plan' : afStatus === 'WAITING' ? 'Decision paused' : 'DECISION READY',
           },
         ]);
 
@@ -243,73 +273,132 @@ export default function Dashboard() {
 
 
         {/* =========================================================================
-            1. TOP SECTION: THE FIELD RIGHT NOW
+            1. TOP SECTION: THE FIELD & MARKET RIGHT NOW
             ========================================================================= */}
         <section className="space-y-4">
-          <div>
-            <span className="font-mono text-xs sm:text-sm text-[#6F956B] tracking-[0.25em] uppercase font-bold block mb-1">
-              01 // LIVE TELEMETRY
-            </span>
-            <h1 className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight">
-              THE FIELD RIGHT NOW
-            </h1>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <span className="font-mono text-xs sm:text-sm text-[#6F956B] tracking-[0.25em] uppercase font-bold block mb-1">
+                01 // LIVE TELEMETRY & MARKET DEMAND
+              </span>
+              <h1 className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight">
+                THE FIELD & MARKET RIGHT NOW
+              </h1>
+            </div>
+            <div className="font-mono text-xs text-[#9A9D91] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#6F956B] animate-pulse" />
+              <span>LIVE SYSTEM SYNC</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            {/* LEFT: Soil Moisture Card */}
-            <div className="lg:col-span-4 p-7 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[220px]">
-              <span className="font-mono text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold">
+          {/* 5-Column Telemetry & Demand Grid (SOIL MOISTURE | RAIN CHANCE | BUYER DEMAND | EXPECTED YIELD | CROP) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-stretch font-mono">
+            
+            {/* 1. SOIL MOISTURE */}
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between space-y-3">
+              <span className="text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold block">
                 SOIL MOISTURE
               </span>
               <div>
-                <div className="font-display text-6xl sm:text-7xl text-[#C7A45A] tracking-tight font-bold my-2">
+                <div className="font-display text-4xl sm:text-5xl text-[#C7A45A] tracking-tight font-bold">
                   {telemetry.soilMoisture}%
                 </div>
-                <span className="font-mono text-xs text-[#C7A45A] font-bold tracking-widest uppercase block">
-                  LOW SOIL MOISTURE (28%)
+                <span className="text-xs text-[#C7A45A] font-bold tracking-wider uppercase block mt-1">
+                  LOW MOISTURE
                 </span>
               </div>
             </div>
 
-            {/* CENTER: Crop Health Card */}
-            <div className="lg:col-span-4 p-7 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[220px]">
-              <span className="font-mono text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold">
-                CROP HEALTH
+            {/* 2. RAIN CHANCE */}
+            <div className="p-6 bg-[#101510] border border-[#315F38] flex flex-col justify-between space-y-3">
+              <span className="text-xs sm:text-sm text-[#6F956B] tracking-widest uppercase font-bold block">
+                RAIN CHANCE
               </span>
               <div>
-                <div className="font-display text-6xl sm:text-7xl text-[#C7A45A] tracking-tight font-bold my-2">
-                  92 <span className="font-mono text-2xl text-[#9A9D91] font-normal">/ 100</span>
+                <div className="font-display text-4xl sm:text-5xl text-[#6F956B] tracking-tight font-bold">
+                  {telemetry.rainProbability}%
                 </div>
-                <span className="font-mono text-xs text-[#6F956B] font-bold tracking-widest uppercase block">
-                  LOW STRESS
+                <span className="text-xs text-[#6F956B] font-bold tracking-wider uppercase block mt-1">
+                  HIGH PROBABILITY
                 </span>
               </div>
             </div>
 
-            {/* RIGHT: Stacked 3 Compact Cards */}
-            <div className="lg:col-span-4 grid grid-cols-1 gap-3">
-              <div className="p-4 bg-[#101510] border border-[#1A241B] flex items-center justify-between">
-                <span className="font-mono text-xs sm:text-sm text-[#9A9D91] uppercase tracking-wider font-semibold">RAIN PROBABILITY</span>
-                <span className="font-display text-2xl text-[#6F956B] font-bold">{telemetry.rainProbability}%</span>
+            {/* 3. BUYER DEMAND (Connected to Buyer Dashboard Slider & MarketMind) */}
+            <div className="p-6 bg-[#101510] border-2 border-[#C7A45A]/70 shadow-[0_0_20px_rgba(199,164,90,0.15)] flex flex-col justify-between space-y-3 relative group">
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm text-[#C7A45A] tracking-widest uppercase font-bold block">
+                  BUYER DEMAND
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-[#2B2310] border border-[#C7A45A]/40 text-[#C7A45A] font-bold tracking-wider uppercase">
+                  MARKET
+                </span>
               </div>
-              <div className="p-4 bg-[#101510] border border-[#1A241B] flex items-center justify-between">
-                <span className="font-mono text-xs sm:text-sm text-[#9A9D91] uppercase tracking-wider font-semibold">AMBIENT TEMP</span>
-                <span className="font-display text-2xl text-[#E8E3D5] font-bold">{telemetry.temperature}°C</span>
-              </div>
-              <div className="p-4 bg-[#101510] border border-[#1A241B] flex items-center justify-between">
-                <span className="font-mono text-xs sm:text-sm text-[#9A9D91] uppercase tracking-wider font-semibold">EXPECTED YIELD</span>
-                <span className="font-display text-2xl text-[#C7A45A] font-bold">11,758 KG</span>
+
+              <div>
+                <div className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight font-bold whitespace-nowrap">
+                  {currentDemandKg.toLocaleString()} <span className="text-xl sm:text-2xl text-[#C7A45A] font-mono">KG</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs text-[#C7A45A] font-bold tracking-wider uppercase block">
+                    COMMERCIAL TARGET
+                  </span>
+                  <Link to="/dashboard/buyer" className="text-[10px] text-[#9A9D91] hover:text-[#C7A45A] underline uppercase">
+                    SLIDER ⚙
+                  </Link>
+                </div>
               </div>
             </div>
+
+            {/* 4. EXPECTED YIELD */}
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between space-y-3">
+              <span className="text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold block">
+                EXPECTED YIELD
+              </span>
+              <div>
+                <div className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight font-bold whitespace-nowrap">
+                  11,758 <span className="text-xl sm:text-2xl text-[#9A9D91] font-mono">KG</span>
+                </div>
+                <span className="text-xs text-[#6F956B] font-bold tracking-wider uppercase block mt-1">
+                  CROPGUARD ML
+                </span>
+              </div>
+            </div>
+
+            {/* 5. CROP */}
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between space-y-3">
+              <span className="text-xs sm:text-sm text-[#9A9D91] tracking-widest uppercase font-semibold block">
+                CROP
+              </span>
+              <div>
+                <div className="font-display text-4xl sm:text-5xl text-[#E8E3D5] tracking-tight font-bold uppercase truncate">
+                  {telemetry.crop || 'RICE'}
+                </div>
+                <span className="text-xs text-[#9A9D91] font-semibold tracking-wider uppercase block mt-1">
+                  {telemetry.cropStage || 'VEGETATIVE'} STAGE
+                </span>
+              </div>
+            </div>
+
           </div>
 
-          {/* Thin Horizontal Telemetry Strip */}
-          <div className="py-3 px-6 bg-[#080B08] border border-[#1A241B] flex flex-wrap items-center justify-between gap-4 font-mono text-xs sm:text-sm text-[#9A9D91]">
-            <span>WIND <strong className="text-[#E8E3D5]">{telemetry.windSpeed} KM/H</strong></span>
-            <span>HUMIDITY <strong className="text-[#E8E3D5]">{telemetry.humidity}%</strong></span>
-            <span>STAGE <strong className="text-[#E8E3D5]">{telemetry.cropStage || 'VEGETATIVE'}</strong></span>
-            <span>SOIL PH <strong className="text-[#E8E3D5]">6.8</strong></span>
-            <span>STATUS <strong className="text-[#6F956B]">LIVE</strong></span>
+          {/* Connected Pipeline Causality Chain Indicator */}
+          <div className="p-3.5 bg-[#080B08] border border-[#1A241B] flex flex-wrap items-center justify-between gap-3 font-mono text-xs text-[#9A9D91]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[#C7A45A] font-bold uppercase">CAUSALITY CHAIN:</span>
+              <span className="text-[#E8E3D5] font-semibold">BUYER DEMAND ({currentDemandKg.toLocaleString()} KG)</span>
+              <span className="text-[#6F956B]">→</span>
+              <span className="text-[#C7A45A] font-semibold">MARKETMIND (சந்தை)</span>
+              <span className="text-[#6F956B]">→</span>
+              <span className="text-[#E8E3D5] font-semibold">SURPLUS RECALCULATION</span>
+              <span className="text-[#6F956B]">→</span>
+              <span className="text-[#6F956B] font-bold">ACTIONFLOW DECISION</span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px]">
+              <span>TEMP <strong className="text-[#E8E3D5]">{telemetry.temperature}°C</strong></span>
+              <span>HUMIDITY <strong className="text-[#E8E3D5]">{telemetry.humidity}%</strong></span>
+              <span>WIND <strong className="text-[#E8E3D5]">{telemetry.windSpeed} KM/H</strong></span>
+            </div>
           </div>
         </section>
 
@@ -318,7 +407,7 @@ export default function Dashboard() {
             2. THE INTELLIGENCE LOOP
             ========================================================================= */}
         <section className="space-y-4 pt-4 border-t border-[#1A241B]">
-          <div className="flex items-baseline justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
               <span className="font-mono text-xs sm:text-sm text-[#6F956B] tracking-[0.25em] uppercase font-bold block mb-1">
                 02 // COORDINATED AGENT NETWORK
@@ -327,26 +416,56 @@ export default function Dashboard() {
                 THE INTELLIGENCE LOOP
               </h2>
             </div>
-            <span className="font-mono text-xs sm:text-sm text-[#9A9D91]">SENSE → PREDICT → MATCH → ACT</span>
+            
+            {/* Pipeline Health Badge */}
+            <div className="flex items-center gap-3 font-mono">
+              <div className={`px-3.5 py-1.5 bg-[#101510] border ${pipelineHealth.online_agents === 4 ? 'border-[#315F38] text-[#6F956B]' : 'border-[#C7A45A] text-[#C7A45A]'} text-xs font-bold tracking-wider uppercase flex items-center gap-2 rounded-sm shadow-sm transition-all duration-300`}>
+                <span className={`w-2 h-2 rounded-full ${pipelineHealth.online_agents === 4 ? 'bg-[#6F956B]' : 'bg-[#C7A45A] animate-pulse'}`} />
+                <span>PIPELINE HEALTH: <strong>{pipelineHealth.online_agents} / {pipelineHealth.total_agents || 4} AGENTS ONLINE</strong></span>
+              </div>
+            </div>
           </div>
 
-          {/* 4 Agent Cards in One Row with Tamil-Dominant Names */}
+          {/* 4 Agent Cards in One Row with Status Indicators & Tamil-Dominant Names */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch font-mono">
             
             {/* Card 1: நிலம் (FarmSense) */}
-            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[220px] hover:border-[#315F38] transition-colors relative">
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[230px] hover:border-[#315F38] transition-colors relative">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
-                    நிலம்
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
+                      நிலம்
+                    </span>
+                    <span className="text-xs text-[#9A9D91] font-mono">
+                      (FarmSense)
+                    </span>
+                  </div>
                   <span className="text-[#6F956B] font-bold text-sm hidden lg:inline">→</span>
                 </div>
-                <span className="text-xs text-[#9A9D91] font-mono block mb-3">
-                  (FarmSense)
-                </span>
+                
+                {/* Agent Status Badge */}
+                <div className="my-2">
+                  {agentStatuses.farmsense?.status === 'FAILED' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B1010] border border-[#8F3E3E] text-[#E87979] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E87979] animate-pulse" />
+                      🔴 FAILED
+                    </span>
+                  ) : agentStatuses.farmsense?.status === 'WAITING' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B2310] border border-[#C7A45A]/40 text-[#C7A45A] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C7A45A]" />
+                      🟡 WAITING
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#102B18] border border-[#315F38] text-[#6F956B] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F956B]" />
+                      🟢 COMPLETED
+                    </span>
+                  )}
+                </div>
+
                 <p className="text-xs text-[#9A9D91] font-sans leading-relaxed">
-                  Checks the farm's soil and weather.
+                  {agentStatuses.farmsense?.message || "Checks the farm's soil and weather."}
                 </p>
               </div>
 
@@ -361,19 +480,42 @@ export default function Dashboard() {
             </div>
 
             {/* Card 2: வளம் (CropGuard) */}
-            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[220px] hover:border-[#315F38] transition-colors relative">
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[230px] hover:border-[#315F38] transition-colors relative">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
-                    வளம்
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
+                      வளம்
+                    </span>
+                    <span className="text-xs text-[#9A9D91] font-mono">
+                      (CropGuard)
+                    </span>
+                  </div>
                   <span className="text-[#6F956B] font-bold text-sm hidden lg:inline">→</span>
                 </div>
-                <span className="text-xs text-[#9A9D91] font-mono block mb-3">
-                  (CropGuard)
-                </span>
+                
+                {/* Agent Status Badge */}
+                <div className="my-2">
+                  {agentStatuses.cropguard?.status === 'FAILED' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B1010] border border-[#8F3E3E] text-[#E87979] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E87979] animate-pulse" />
+                      🔴 FAILED
+                    </span>
+                  ) : agentStatuses.cropguard?.status === 'WAITING' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B2310] border border-[#C7A45A]/40 text-[#C7A45A] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C7A45A]" />
+                      🟡 WAITING
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#102B18] border border-[#315F38] text-[#6F956B] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F956B]" />
+                      🟢 COMPLETED
+                    </span>
+                  )}
+                </div>
+
                 <p className="text-xs text-[#9A9D91] font-sans leading-relaxed">
-                  Checks the crop's health and expected harvest.
+                  {agentStatuses.cropguard?.message || "Checks the crop's health and expected harvest."}
                 </p>
               </div>
 
@@ -388,19 +530,42 @@ export default function Dashboard() {
             </div>
 
             {/* Card 3: சந்தை (MarketMind) */}
-            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[220px] hover:border-[#C7A45A]/60 transition-colors relative">
+            <div className="p-6 bg-[#101510] border border-[#1A241B] flex flex-col justify-between min-h-[230px] hover:border-[#C7A45A]/60 transition-colors relative">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
-                    சந்தை
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
+                      சந்தை
+                    </span>
+                    <span className="text-xs text-[#9A9D91] font-mono">
+                      (MarketMind)
+                    </span>
+                  </div>
                   <span className="text-[#6F956B] font-bold text-sm hidden lg:inline">→</span>
                 </div>
-                <span className="text-xs text-[#9A9D91] font-mono block mb-3">
-                  (MarketMind)
-                </span>
+                
+                {/* Agent Status Badge */}
+                <div className="my-2">
+                  {agentStatuses.marketmind?.status === 'FAILED' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B1010] border border-[#8F3E3E] text-[#E87979] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E87979] animate-pulse" />
+                      🔴 FAILED
+                    </span>
+                  ) : agentStatuses.marketmind?.status === 'WAITING' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B2310] border border-[#C7A45A]/40 text-[#C7A45A] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C7A45A]" />
+                      🟡 WAITING
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#102B18] border border-[#315F38] text-[#6F956B] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F956B]" />
+                      🟢 COMPLETED
+                    </span>
+                  )}
+                </div>
+
                 <p className="text-xs text-[#9A9D91] font-sans leading-relaxed">
-                  Checks buyer demand and where the harvest can be sold.
+                  {agentStatuses.marketmind?.message || "Checks buyer demand and where the harvest can be sold."}
                 </p>
               </div>
 
@@ -415,31 +580,54 @@ export default function Dashboard() {
             </div>
 
             {/* Card 4: செயல் (ActionFlow) — HIGHLIGHTED HERO DECISION AGENT */}
-            <div className="p-6 bg-[#102B18]/70 border-2 border-[#6F956B] shadow-[0_0_30px_rgba(111,149,107,0.25)] flex flex-col justify-between min-h-[220px] relative">
+            <div className="p-6 bg-[#102B18]/70 border-2 border-[#6F956B] shadow-[0_0_30px_rgba(111,149,107,0.25)] flex flex-col justify-between min-h-[230px] relative">
               <div className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#C7A45A] text-[#080B08] text-[9px] font-bold tracking-widest uppercase rounded-sm font-mono shadow-sm">
                 KEY HERO DECISION
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
-                    செயல்
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-3xl sm:text-4xl text-[#E8E3D5] font-bold">
+                      செயல்
+                    </span>
+                    <span className="text-xs text-[#6F956B] font-mono font-bold">
+                      (ActionFlow)
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs text-[#6F956B] font-mono font-bold block mb-3">
-                  (ActionFlow)
-                </span>
+
+                {/* Agent Status Badge */}
+                <div className="my-2">
+                  {agentStatuses.actionflow?.status === 'FAILED' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B1010] border border-[#8F3E3E] text-[#E87979] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E87979] animate-pulse" />
+                      🔴 FAILED
+                    </span>
+                  ) : agentStatuses.actionflow?.status === 'WAITING' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#2B2310] border border-[#C7A45A]/40 text-[#C7A45A] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C7A45A]" />
+                      🟡 WAITING
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#102B18] border border-[#315F38] text-[#6F956B] text-[10px] font-bold tracking-wider uppercase rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F956B]" />
+                      🟢 DECISION READY
+                    </span>
+                  )}
+                </div>
+
                 <p className="text-xs text-[#E8E3D5]/90 font-sans leading-relaxed">
-                  Combines everything and decides what the farmer should do.
+                  {agentStatuses.actionflow?.message || "Combines everything and decides what the farmer should do."}
                 </p>
               </div>
 
               <div className="pt-3 border-t border-[#315F38] mt-4">
                 <div className="font-display text-xl sm:text-2xl text-[#C7A45A] font-bold">
-                  {agents[3]?.mainMetric === '1 PRIORITY ACTION' ? 'DELAY IRRIGATION' : agents[3]?.mainMetric || 'DELAY IRRIGATION'}
+                  {pipelineHealth.online_agents < 4 ? 'DECISION PAUSED' : (agents[3]?.mainMetric === '1 PRIORITY ACTION' ? 'DELAY IRRIGATION' : agents[3]?.mainMetric || 'DELAY IRRIGATION')}
                 </div>
                 <div className="text-xs text-[#6F956B] font-bold mt-1 leading-normal">
-                  ✓ {agents[3]?.decision || 'Rain is likely soon, so irrigation can wait and water can be saved.'}
+                  {pipelineHealth.online_agents < 4 ? 'One or more agents require attention' : `✓ ${agents[3]?.decision || 'Rain is likely soon, so irrigation can wait and water can be saved.'}`}
                 </div>
               </div>
             </div>
@@ -462,9 +650,25 @@ export default function Dashboard() {
               </h2>
             </div>
             <span className="font-mono text-xs sm:text-sm text-[#9A9D91] uppercase">
-              {actionPlan.length} PRIORITIZED ACTIONS
+              {pipelineHealth.online_agents < 4 ? 'DECISION PAUSED' : `${actionPlan.length} PRIORITIZED ACTIONS`}
             </span>
           </div>
+
+          {/* Decision Paused Warning if Pipeline Degraded */}
+          {pipelineHealth.online_agents < 4 && (
+            <div className="p-6 bg-[#2B1010]/80 border-2 border-[#8F3E3E] font-mono space-y-2">
+              <div className="flex items-center gap-2 text-[#E87979] text-xs font-bold tracking-widest uppercase">
+                <span className="w-2 h-2 rounded-full bg-[#E87979] animate-pulse" />
+                <span>DECISION PAUSED // PIPELINE DEGRADED</span>
+              </div>
+              <h3 className="font-display text-2xl text-[#E8E3D5] font-bold">
+                DECISION PAUSED
+              </h3>
+              <p className="text-xs text-[#E87979]">
+                One or more intelligence agents require attention. The decision loop is paused until upstream pipeline data is restored.
+              </p>
+            </div>
+          )}
 
           {/* Clean Action-Plan List */}
           <div className="space-y-3 font-mono text-xs">

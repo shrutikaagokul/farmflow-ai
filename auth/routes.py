@@ -49,16 +49,26 @@ def _extract_token(authorization: Optional[str]) -> Optional[str]:
     return authorization
 
 
+import os
+
 # ---------------------------------------------------------------------------
 # POST /api/auth/request-otp
 # ---------------------------------------------------------------------------
 @router.post("/request-otp", response_model=OTPResponse)
 def api_request_otp(body: OTPRequest):
     """Generate and send an OTP to the given mobile number."""
+    masked_mobile = '*' * (len(body.mobile) - 2) + body.mobile[-2:] if len(body.mobile) >= 2 else body.mobile
+    print(f"\n[FARMFLOW API] Received /api/auth/request-otp — Mobile: {masked_mobile}, Role: {body.role}", flush=True)
+
     success, message, expires = request_otp(body.mobile, body.role)
     if not success:
         raise HTTPException(status_code=429, detail=message)
-    return OTPResponse(success=True, message=message, expires_in_seconds=expires)
+
+    return OTPResponse(
+        success=True,
+        message=message,
+        expires_in_seconds=expires,
+    )
 
 
 # ---------------------------------------------------------------------------

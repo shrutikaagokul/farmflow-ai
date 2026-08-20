@@ -16,6 +16,17 @@ Endpoints:
     GET  /docs             — Auto-generated API docs (Swagger UI)
 """
 
+import os
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+if "FARMFLOW_DEMO_MODE" not in os.environ:
+    os.environ["FARMFLOW_DEMO_MODE"] = "true"
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
@@ -29,10 +40,19 @@ from agents.marketmind.marketmind import run_marketmind
 from agents.actionflow.logic import run_actionflow
 from auth.routes import router as auth_router
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    demo_mode_status = os.getenv("FARMFLOW_DEMO_MODE", "true").lower() in ("true", "1", "yes")
+    print(f"\n[FARMFLOW AUTH] DEMO MODE: {'true' if demo_mode_status else 'false'}\n", flush=True)
+    yield
+
 app = FastAPI(
     title="FarmFlow AI — Agent API",
     description="Multi-agent precision agriculture backend. SENSE → PREDICT → MATCH → ACT.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------------------
@@ -135,57 +155,120 @@ def actionflow_endpoint(request: ActionFlowRequest):
     """
     Run the full FarmFlow AI pipeline: SENSE → PREDICT → MATCH → ACT.
 
-    Returns the complete ActionFlow output with prioritised action plan.
+    Returns per-agent execution status, pipeline health, and prioritized action plan.
     """
+    agent_statuses = {
+        "farmsense": {"status": "WAITING", "error": None, "message": "Waiting to execute"},
+        "cropguard": {"status": "WAITING", "error": None, "message": "Waiting for FarmSense"},
+        "marketmind": {"status": "WAITING", "error": None, "message": "Waiting for upstream data"},
+        "actionflow": {"status": "WAITING", "error": None, "message": "Decision paused"},
+    }
+
+    farmsense_dict = {}
+    cropguard_dict = {}
+    marketmind_dict = {}
+    actionflow_result = {}
+
     try:
         # Step 1: FarmSense (SENSE)
-        telemetry_dict = {
-            "temperature": request.temperature,
-            "humidity": request.humidity,
-            "soil_moisture": request.soil_moisture,
-            "rain_probability": request.rain_probability,
-            "wind_speed": request.wind_speed,
-            "crop": request.crop,
-            "crop_stage": request.crop_stage,
-        }
-        farmsense_result = farmsense_analyze(telemetry_dict)
-        farmsense_dict = farmsense_result.model_dump()
+        try:
+            telemetry_dict = {
+                "temperature": request.temperature,
+                "humidity": request.humidity,
+                "soil_moisture": request.soil_moisture,
+                "rain_probability": request.rain_probability,
+                "wind_speed": request.wind_speed,
+                "crop": request.crop,
+                "crop_stage": request.crop_stage,
+            }
+            farmsense_result = farmsense_analyze(telemetry_dict)
+            farmsense_dict = farmsense_result.model_dump()
+            agent_statuses["farmsense"] = {
+                "status": "COMPLETED",
+                "error": None,
+                "message": "Field conditions analyzed",
+            }
+        except Exception as e:
+            agent_statuses["farmsense"] = {
+                "status": "FAILED",
+                "error": str(e),
+                "message": "Unable to evaluate field conditions",
+            }
+            agent_statuses["cropguard"]["message"] = "Waiting for FarmSense"
+            agent_statuses["marketmind"]["message"] = "Waiting for upstream data"
+            agent_statuses["actionflow"]["message"] = "Decision paused"
+            return _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result)
 
         # Step 2: CropGuard (PREDICT)
-        farm_input = FarmInput(**telemetry_dict)
-        farmsense_input = FarmSenseInput(
-            irrigation_decision=farmsense_result.irrigation_decision,
-            delay_hours=farmsense_result.delay_hours,
-            water_saved_l=farmsense_result.water_saved_l,
-            reason=farmsense_result.reason,
-        )
-        cropguard_result = cropguard_predict(farm=farm_input, farmsense=farmsense_input)
-        cropguard_dict = cropguard_result.model_dump()
+        try:
+            farm_input = FarmInput(**telemetry_dict)
+            farmsense_input = FarmSenseInput(
+                irrigation_decision=farmsense_result.irrigation_decision,
+                delay_hours=farmsense_result.delay_hours,
+                water_saved_l=farmsense_result.water_saved_l,
+                reason=farmsense_result.reason,
+            )
+            cropguard_result = cropguard_predict(farm=farm_input, farmsense=farmsense_input)
+            cropguard_dict = cropguard_result.model_dump()
+            agent_statuses["cropguard"] = {
+                "status": "COMPLETED",
+                "error": None,
+                "message": "Yield predicted",
+            }
+        except Exception as e:
+            agent_statuses["cropguard"] = {
+                "status": "FAILED",
+                "error": str(e),
+                "message": "Yield prediction unavailable",
+            }
+            agent_statuses["marketmind"]["message"] = "Waiting for CropGuard output"
+            agent_statuses["actionflow"]["message"] = "Decision paused"
+            return _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result)
 
         # Step 3: MarketMind (MATCH)
-        destinations = request.destinations or _DEFAULT_DESTINATIONS
-        marketmind_input = {
-            "expected_yield_kg": cropguard_result.expected_yield_kg,
-            "crop": request.crop,
-            "destinations": destinations,
-        }
-        if request.market_demand is not None:
-            marketmind_input["market_demand"] = request.market_demand
-        if request.price_per_kg is not None:
-            marketmind_input["price_per_kg"] = request.price_per_kg
-        marketmind_dict = run_marketmind(marketmind_input)
+        try:
+            destinations = request.destinations or _DEFAULT_DESTINATIONS
+            marketmind_input = {
+                "expected_yield_kg": cropguard_result.expected_yield_kg,
+                "crop": request.crop,
+                "destinations": destinations,
+            }
+            if request.market_demand is not None:
+                marketmind_input["market_demand"] = request.market_demand
+            if request.price_per_kg is not None:
+                marketmind_input["price_per_kg"] = request.price_per_kg
+            marketmind_dict = run_marketmind(marketmind_input)
+            agent_statuses["marketmind"] = {
+                "status": "COMPLETED",
+                "error": None,
+                "message": "Demand matched",
+            }
+        except Exception as e:
+            agent_statuses["marketmind"] = {
+                "status": "FAILED",
+                "error": str(e),
+                "message": "Market matching unavailable",
+            }
+            agent_statuses["actionflow"]["message"] = "Waiting for MarketMind"
+            return _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result)
 
         # Step 4: ActionFlow (ACT)
-        actionflow_result = run_actionflow(farmsense_dict, cropguard_dict, marketmind_dict)
+        try:
+            actionflow_result = run_actionflow(farmsense_dict, cropguard_dict, marketmind_dict)
+            agent_statuses["actionflow"] = {
+                "status": "DECISION_READY",
+                "error": None,
+                "message": "Action plan generated",
+            }
+        except Exception as e:
+            agent_statuses["actionflow"] = {
+                "status": "FAILED",
+                "error": str(e),
+                "message": "Unable to generate final action plan",
+            }
+            return _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result)
 
-        return {
-            "pipeline": {
-                "farmsense": farmsense_dict,
-                "cropguard": cropguard_dict,
-                "marketmind": marketmind_dict,
-            },
-            "actionflow": actionflow_result,
-        }
+        return _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result)
 
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=e.errors())
@@ -193,4 +276,36 @@ def actionflow_endpoint(request: ActionFlowRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _build_pipeline_response(agent_statuses, farmsense_dict, cropguard_dict, marketmind_dict, actionflow_result):
+    """Construct structured per-agent health response."""
+    online_count = sum(
+        1 for s in agent_statuses.values() if s["status"] in ("COMPLETED", "DECISION_READY")
+    )
+    return {
+        "pipeline": {
+            "farmsense": farmsense_dict,
+            "cropguard": cropguard_dict,
+            "marketmind": marketmind_dict,
+        },
+        "actionflow": actionflow_result,
+        "agent_statuses": agent_statuses,
+        "pipeline_health": {
+            "online_agents": online_count,
+            "total_agents": 4,
+            "status": "ALL_ONLINE" if online_count == 4 else "DEGRADED",
+        },
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print("\n==================================================")
+    print("  FarmFlow AI API Server — Autonomous Agent Pipeline")
+    print("  Running on http://localhost:8000")
+    print("  Interactive Docs available at http://localhost:8000/docs")
+    print("==================================================\n")
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
 

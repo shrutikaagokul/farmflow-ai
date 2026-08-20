@@ -52,7 +52,7 @@ export default function Login() {
         setError('Demo login failed. Ensure backend server is running on port 8000.');
       }
     } catch {
-      setError('Connection error. Run: python -m uvicorn server:app --port 8000');
+      setError('Connection error. Run: python server.py');
     }
     setLoading(false);
   };
@@ -69,27 +69,39 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
+      console.log('[FARMFLOW AUTH] Requesting OTP via /api/auth/request-otp for role:', role);
       let res = await fetch('/api/auth/request-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, role }),
-      }).catch(() => null);
+      }).catch((err) => {
+        console.warn('[FARMFLOW AUTH] Relative fetch failed, attempting http://localhost:8000', err);
+        return null;
+      });
 
       if (!res || !res.ok) {
+        console.warn('[FARMFLOW AUTH] Relative fetch returned status:', res?.status, '— Retrying direct target http://localhost:8000');
         res = await fetch('http://localhost:8000/api/auth/request-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mobile, role }),
-        }).catch(() => null);
+        }).catch((err) => {
+          console.error('[FARMFLOW AUTH] Direct target fetch failed:', err);
+          return null;
+        });
       }
+
+      console.log('[FARMFLOW AUTH] Final request OTP HTTP status:', res?.status);
 
       if (res && res.ok) {
         setStep(STEPS.OTP);
+        setOtp('');
       } else {
         const detail = res ? (await res.json().catch(() => ({}))).detail : null;
         setError(detail || 'Failed to send OTP. Ensure backend is running.');
       }
-    } catch {
+    } catch (err) {
+      console.error('[FARMFLOW AUTH] Unexpected error during OTP request:', err);
       setError('Connection error.');
     }
     setLoading(false);
@@ -107,6 +119,7 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
+      console.log('[FARMFLOW AUTH] Verifying OTP via /api/auth/verify-otp');
       let res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,6 +133,8 @@ export default function Login() {
           body: JSON.stringify({ mobile, otp, role }),
         }).catch(() => null);
       }
+
+      console.log('[FARMFLOW AUTH] Final verify OTP HTTP status:', res?.status);
 
       if (res && res.ok) {
         const data = await res.json();
@@ -289,6 +304,17 @@ export default function Login() {
                 </button>
               </div>
 
+              {/* Clean OTP Sent Notification Banner */}
+              <div className="p-4 bg-[#101510] border border-[#315F38] font-mono space-y-1 text-center my-2">
+                <div className="flex items-center justify-center gap-2 text-[#6F956B] text-xs font-bold tracking-widest uppercase">
+                  <span className="w-2 h-2 rounded-full bg-[#6F956B] animate-pulse" />
+                  <span>OTP SENT</span>
+                </div>
+                <p className="text-xs text-[#9A9D91] font-sans">
+                  Check the backend terminal for the demo OTP.
+                </p>
+              </div>
+
               <div>
                 <input
                   type="text"
@@ -300,7 +326,7 @@ export default function Login() {
                   autoFocus
                 />
                 <span className="block font-mono text-xs text-[#9A9D91] tracking-wider uppercase text-center mt-2">
-                  (Demo/Hackathon OTP is displayed in backend terminal logs)
+                  DEMO OTP IS LOGGED IN BACKEND TERMINAL
                 </span>
               </div>
 

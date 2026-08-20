@@ -10,6 +10,7 @@ Provider abstraction so a real SMS gateway can be plugged in later.
 
 import os
 import secrets
+import sys
 import time
 from typing import Optional, Tuple
 
@@ -56,19 +57,15 @@ def request_otp(mobile: str, role: str) -> Tuple[bool, str, int]:
         "role": role,
     }
 
-    # -----------------------------------------------------------------------
-    # SMS Provider Abstraction
-    # In production, call the configured SMS provider here.
-    # For the hackathon, we log the OTP to the server console.
-    # -----------------------------------------------------------------------
+    # Log to server console if demo mode is enabled
     _send_otp(mobile, otp)
 
-    return True, "OTP sent successfully", OTP_EXPIRY_SECONDS
+    return True, "OTP generated successfully", OTP_EXPIRY_SECONDS
 
 
 def verify_otp(mobile: str, otp: str, role: str) -> Tuple[bool, str]:
     """
-    Verify the OTP for a mobile number.
+    Verify the OTP for a mobile number. Single-use: removes entry on success.
 
     Returns:
         (success, message)
@@ -99,7 +96,7 @@ def verify_otp(mobile: str, otp: str, role: str) -> Tuple[bool, str]:
         remaining = MAX_VERIFY_ATTEMPTS - record["attempts"]
         return False, f"Invalid OTP. {remaining} attempt(s) remaining"
 
-    # Success — clean up
+    # Success — clean up immediately so OTP is single-use
     del _otp_store[mobile]
     return True, "OTP verified successfully"
 
@@ -123,14 +120,24 @@ def _send_otp(mobile: str, otp: str) -> None:
     """
     Send OTP via the configured SMS provider.
 
-    For the hackathon prototype, this logs the OTP to the server console.
-    In production, replace with an actual SMS API call using env variables:
-        SMS_PROVIDER, SMS_API_KEY, SMS_API_SECRET, SMS_SENDER_ID
+    For hackathon demo mode, this prints the OTP directly to sys.stdout with immediate flush.
+    In production (FARMFLOW_DEMO_MODE=false), no OTP is printed.
     """
-    provider = os.getenv("SMS_PROVIDER", "console")
+    is_demo_mode = os.getenv("FARMFLOW_DEMO_MODE", "true").lower() in ("true", "1", "yes")
+    masked_mobile = '*' * (len(mobile) - 2) + mobile[-2:] if len(mobile) >= 2 else mobile
 
-    if provider == "console":
-        print(f"[FarmFlow OTP] Mobile: {mobile} → OTP: {otp}")
+    if is_demo_mode:
+        log_msg = (
+            "\n==================================================\n"
+            "[FARMFLOW AUTH] DEMO OTP GENERATED\n"
+            f"Mobile: {masked_mobile}\n"
+            f"OTP: {otp}\n"
+            "Expires: 5 minutes\n"
+            "==================================================\n"
+        )
+        print(log_msg, flush=True)
+        sys.stdout.flush()
     else:
-        # Future: integrate Twilio, MSG91, AWS SNS, etc.
-        print(f"[FarmFlow OTP] Would send OTP to {mobile} via {provider}")
+        log_msg = f"[FarmFlow AUTH] SMS payload prepared for Mobile: {masked_mobile}\n"
+        print(log_msg, flush=True)
+        sys.stdout.flush()
