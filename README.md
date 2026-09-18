@@ -56,8 +56,30 @@ Combines the outputs of the preceding agents and generates a prioritized action 
              │                       │
              └─────────────── API ───┘
 ```
+---
+
+## Preview
+
+### Multi-Agent Architecture
+
+<p align="center">
+  <img src="./public/screenshots/architecture.png" alt="FarmFlow AI multi-agent architecture" width="100%">
+</p>
+
+### Command Center
+
+<p align="center">
+  <img src="./public/screenshots/command-center.png" alt="FarmFlow AI command center" width="100%">
+</p>
+
+### ActionFlow Decision
+
+<p align="center">
+  <img src="./public/screenshots/actionflow.png" alt="FarmFlow AI ActionFlow decision" width="100%">
+</p>
 
 ---
+
 
 ## Features
 
