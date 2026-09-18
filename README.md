@@ -1,16 +1,213 @@
-# React + Vite
+# FarmFlow AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+### Multi-Agent Precision Agriculture System
 
-Currently, two official plugins are available:
+FarmFlow AI is a multi-agent precision agriculture system designed to connect field sensing, crop prediction, market matching, and action planning into a single decision-making pipeline.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+It combines a React-based interface with a Python backend where specialized agents work together to transform farm data into actionable insights.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## The Agent Pipeline
 
-## Expanding the Oxlint configuration
+```text
+SENSE  →  PREDICT  →  MATCH  →  ACT
+   ↓         ↓          ↓         ↓
+FarmSense  CropGuard  MarketMind  ActionFlow
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### FarmSense — SENSE
+
+Analyzes field and environmental conditions such as temperature, humidity, soil moisture, rainfall probability, wind speed, crop, and crop stage to generate irrigation-related insights.
+
+### CropGuard — PREDICT
+
+Uses farm conditions and FarmSense outputs to estimate crop health and expected yield.
+
+### MarketMind — MATCH
+
+Matches predicted harvest quantities with available market and destination demand.
+
+### ActionFlow — ACT
+
+Combines the outputs of the preceding agents and generates a prioritized action plan.
+
+---
+
+## Architecture
+
+```text
+                    FarmFlow AI
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+       React + Vite              FastAPI
+        Frontend                  Backend
+             │                       │
+             │              ┌────────┴────────┐
+             │              │                 │
+             │          FarmSense        CropGuard
+             │              │                 │
+             │              └────────┬────────┘
+             │                       │
+             │                  MarketMind
+             │                       │
+             │                  ActionFlow
+             │                       │
+             └─────────────── API ───┘
+```
+
+---
+
+## Features
+
+- Multi-agent agricultural decision pipeline
+- Farm telemetry analysis
+- Crop health and yield prediction
+- Harvest-to-market matching
+- Automated action planning
+- Role-based authentication
+- Interactive API documentation
+- React-based dashboard interface
+- Modular agent architecture
+
+---
+
+## Tech Stack
+
+### Frontend
+
+- React
+- Vite
+- JavaScript
+- CSS
+
+### Backend
+
+- Python
+- FastAPI
+- Pydantic
+- Uvicorn
+
+### AI & System Design
+
+- Multi-agent architecture
+- Machine learning-based prediction
+- Data-driven decision pipeline
+
+---
+
+## API
+
+The backend exposes endpoints for individual agents as well as the complete pipeline.
+
+```text
+POST /api/farmsense
+POST /api/cropguard
+POST /api/marketmind
+POST /api/actionflow
+
+GET  /health
+GET  /docs
+```
+
+FastAPI also provides an interactive Swagger UI for exploring and testing the API locally.
+
+---
+
+## Running Locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/shrutikaagokul/farmflow-ai.git
+cd farmflow-ai
+```
+
+### 2. Install frontend dependencies
+
+```bash
+npm install
+```
+
+### 3. Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Start the backend
+
+```bash
+python -m uvicorn server:app --port 8000 --reload
+```
+
+The backend API will be available at:
+
+```text
+http://localhost:8000
+```
+
+Interactive API documentation:
+
+```text
+http://localhost:8000/docs
+```
+
+### 5. Start the frontend
+
+In a separate terminal:
+
+```bash
+npm run dev
+```
+
+Then open the local URL provided by Vite.
+
+---
+
+## Project Structure
+
+```text
+farmflow-ai/
+│
+├── agents/
+│   ├── farmsense/
+│   ├── cropguard/
+│   ├── marketmind/
+│   └── actionflow/
+│
+├── auth/
+│
+├── data/
+│
+├── public/
+│
+├── src/
+│   ├── assets/
+│   ├── components/
+│   ├── context/
+│   ├── data/
+│   ├── pages/
+│   └── utils/
+│
+├── server.py
+├── requirements.txt
+├── package.json
+├── package-lock.json
+└── vite.config.js
+```
+
+---
+
+## Project Status
+
+FarmFlow AI is a working prototype exploring how multiple specialized agents can be connected into a unified agricultural decision-support system.
+
+The project focuses on combining field intelligence, predictive analysis, market awareness, and action planning into one connected workflow.
+
+---
+
+## Built With
+
+React · Vite · Python · FastAPI · Machine Learning · Multi-Agent Systems
